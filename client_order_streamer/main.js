@@ -24,12 +24,16 @@ async function streamOrders(cvs_filepath) {
       const order = parseLine(line);
 
       // Push the send promise into the array to ensure we wait for it
-      const sendPromise = channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
-        persistent: true,
-      });
+      const sendPromise = channel.sendToQueue(
+        queue,
+        Buffer.from(JSON.stringify(order)),
+        {
+          persistent: true,
+        }
+      );
       sendPromises.push(sendPromise);
 
-      console.log("Order sent to queue:", order); // Log each order
+      console.log("Order sent to queue:"); // Log each order
     } catch (error) {
       console.error("Error processing line:", line, error);
     }

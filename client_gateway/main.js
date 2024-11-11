@@ -43,35 +43,23 @@ async function consumeAndForwardOrders() {
     const channel = await connection.createChannel();
 
     // Ensure the queues exist
-    await channel.assertQueue(ORDER_QUEUE, { durable: true, autoDelete: true });
+    await channel.assertQueue(ORDER_QUEUE, { durable: true });
     //await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
     console.log("Gateway is now consuming orders...");
-
-    let lastMessageTime = Date.now(); // Track the time of the last received message
-
-    // Function to handle timeouts (20 seconds)
-    const timeoutDuration = 20000; // 20 seconds timeout
-    const timeoutCheck = setInterval(() => {
-      if (Date.now() - lastMessageTime > timeoutDuration) {
-        console.log("No messages received for 20 seconds. Closing connection...");
-        channel.close();
-        connection.close();
-        clearInterval(timeoutCheck); // Stop checking for timeouts
-      }
-    }, 10000); // Check every second
 
     // Start consuming messages
     channel.consume(ORDER_QUEUE, async (msg) => {
       if (msg !== null) {
         lastMessageTime = Date.now(); // Reset the timer when a message is received
         const order = JSON.parse(msg.content.toString());
+        const { price } = order;
 
         // Validate the order
         if (validateOrder(order)) {
           console.log(
             "Order validated, forwarding to Order Manager... %s",
-            order
+            price
           );
 
           // Forward to the Order Manager queue
