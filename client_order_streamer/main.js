@@ -9,7 +9,7 @@ async function streamOrders(cvs_filepath) {
   const queue = "orders";
 
   // Ensure the queue exists
-  await channel.assertQueue(queue, { durable: true });
+  await channel.assertQueue(queue, { durable: true, autoDelete: true });
 
   const orderStream = fs
     .createReadStream(cvs_filepath, { encoding: "utf-8" })
