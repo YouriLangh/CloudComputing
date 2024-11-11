@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+    rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "15672:15672" # RabbitMQ Management UI
+      - "5672:5672" # AMQP port for RabbitMQ consumers/producers
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  client_order_streamer:
+    build: ./client_order_streamer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy # Wait for RabbitMQ to be healthy
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    restart: always
+
+  client_gateway:
+    build: ./client_gateway
+    depends_on:
+      rabbitmq:
+        condition: service_healthy # Wait for RabbitMQ to be healthy
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    restart: always
+
+  order_manager:
+    build: ./order_manager
+    depends_on:
+      rabbitmq:
+        condition: service_healthy # Wait for RabbitMQ to be healthy
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    restart: always

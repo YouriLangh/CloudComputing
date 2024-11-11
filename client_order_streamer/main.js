@@ -1,61 +1,40 @@
-const assert = require("assert");
 const fs = require("fs");
-const split2 = require('split2');
+const split2 = require("split2");
+const amqp = require("amqplib");
 
-/** 
- * This file reads from the recorder client orders and emits requests to the specified endpoint
- **/
+async function streamOrders(cvs_filepath) {
+    const connection = await amqp.connect("amqp://localhost");
+    const channel = await connection.createChannel();
+    const queue = "orders";
 
-//TODO: You must adapt these to your own setting!
-const end_host = "";
-const end_port = "";
-const end_path = "";
+    // Ensure the queue exists
+    await channel.assertQueue(queue, { durable: true });
 
-const endpoint_url = `http://${end_host}:${end_port}/${end_path}`;
+    const orderStream = fs.createReadStream(cvs_filepath, { encoding: "utf-8" }).pipe(split2());
 
-/**
- * Takes the dataset file's path and a callback that will process each line in the dataset 
- * e.g. the function send that takes the line and makes a network request.
- * @param {String} cvs_filepath 
- * @param {Function} record_handler 
- */
-function processFileContents(cvs_filepath, record_handler) {
-    const order_stream = fs.createReadStream(cvs_filepath, { encoding: "utf-8", start: 0 }).pipe(split2());
-    order_stream.on('data', (line) => {
-        record_handler(line)
-    })
+    for await (const line of orderStream) {
+        const order = parseLine(line);
+        channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), { persistent: true });
+    }
+
+    setTimeout(() => {
+        connection.close();
+    }, 500); // Close the connection after a delay to ensure all messages are sent
 }
 
-/**
- * @param {String} line 
- * @returns {JSON}
- */
 function parseLine(line) {
-    let fields_array = line.split(",");
+    const fields = line.split(",");
     assert.equal(fields_array.length, 7, "Expected 7 fields!");
     return {
-        "user_id": fields_array[0],
-        "timestamp_ns": fields_array[1],
-        "price": fields_array[2],
-        "symbol": fields_array[3],
-        "quantity": fields_array[4],
-        "order_type": fields_array[5],
-        "trader_type": fields_array[6]
-    }
+        user_id: fields[0],
+        timestamp_ns: fields[1],
+        price: fields[2],
+        symbol: fields[3],
+        quantity: fields[4],
+        order_type: fields[5],
+        trader_type: fields[6],
+    };
 }
 
-
-/**
- * 
- * This function makes a POST request the configured end_url.
- * It uses JSON as the request's body format to attach the order.
- * 
- */
-function send(order_line) {
-    const json_order = parseLine(order_line);
-    fetch(endpoint_url, {
-        method: "PUSH",
-        body: JSON.stringify(json_order),
-        keepalive: true
-    });
-}
+const cvs_filepath = "data/market_simulation_orders-1h.csv";
+streamOrders(cvs_filepath);
