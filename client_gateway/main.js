@@ -50,16 +50,16 @@ async function consumeAndForwardOrders() {
 
     let lastMessageTime = Date.now(); // Track the time of the last received message
 
-    // Function to handle timeouts (5 seconds)
-    const timeoutDuration = 5000; // 5 seconds timeout
+    // Function to handle timeouts (20 seconds)
+    const timeoutDuration = 20000; // 20 seconds timeout
     const timeoutCheck = setInterval(() => {
       if (Date.now() - lastMessageTime > timeoutDuration) {
-        console.log("No messages received for 5 seconds. Closing connection...");
+        console.log("No messages received for 20 seconds. Closing connection...");
         channel.close();
         connection.close();
         clearInterval(timeoutCheck); // Stop checking for timeouts
       }
-    }, 1000); // Check every second
+    }, 10000); // Check every second
 
     // Start consuming messages
     channel.consume(ORDER_QUEUE, async (msg) => {

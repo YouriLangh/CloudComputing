@@ -15,16 +15,31 @@ async function streamOrders(cvs_filepath) {
     .createReadStream(cvs_filepath, { encoding: "utf-8" })
     .pipe(split2());
 
+  // This will hold all promises for sending to queue, to wait for completion
+  const sendPromises = [];
+
   // Loop through each line of the CSV and send to the queue
   for await (const line of orderStream) {
-    const order = parseLine(line);
-    channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
-      persistent: true,
-    });
+    try {
+      const order = parseLine(line);
+
+      // Push the send promise into the array to ensure we wait for it
+      const sendPromise = channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
+        persistent: true,
+      });
+      sendPromises.push(sendPromise);
+
+      console.log("Order sent to queue:", order); // Log each order
+    } catch (error) {
+      console.error("Error processing line:", line, error);
+    }
   }
 
-  // Close the connection after all lines are processed
-  console.log("Stream ended, closing connection...");
+  // Wait for all promises to resolve (ensure the last line is processed)
+  await Promise.all(sendPromises);
+
+  // Once all lines have been sent, close the connection
+  console.log("Finished streaming orders.");
   connection.close();
 }
 
