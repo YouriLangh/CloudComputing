@@ -15,16 +15,18 @@ async function streamOrders(cvs_filepath) {
     .createReadStream(cvs_filepath, { encoding: "utf-8" })
     .pipe(split2());
 
+  orderStream.on("end", () => {
+    // Close the connection when the stream ends
+    console.log("Stream ended, closing connection...");
+    connection.close();
+  });
+
   for await (const line of orderStream) {
     const order = parseLine(line);
     channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
       persistent: true,
     });
   }
-
-  setTimeout(() => {
-    connection.close();
-  }, 500); // Close the connection after a delay to ensure all messages are sent
 }
 
 function parseLine(line) {
