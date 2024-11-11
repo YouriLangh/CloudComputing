@@ -44,7 +44,7 @@ async function consumeAndForwardOrders() {
 
     // Ensure the queues exist
     await channel.assertQueue(ORDER_QUEUE, { durable: true });
-    //await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
+    await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
     console.log("Gateway is now consuming orders...");
 
@@ -62,11 +62,11 @@ async function consumeAndForwardOrders() {
           );
 
           // Forward to the Order Manager queue
-          // channel.sendToQueue(
-          //     ORDER_MANAGER_QUEUE,
-          //     Buffer.from(JSON.stringify(order)),
-          //     { persistent: true }
-          // );
+          channel.sendToQueue(
+            ORDER_MANAGER_QUEUE,
+            Buffer.from(JSON.stringify(order)),
+            { persistent: true }
+          );
 
           channel.ack(msg); // Acknowledge the message upon successful forwarding
         } else {
