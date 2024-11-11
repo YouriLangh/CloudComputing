@@ -3,10 +3,10 @@ const Heap = require('heap');
 function createSideHeaps() {
     return {
         asks: new Heap((a, b) => {
-            return a.price_level - b.price_level;
+            return a.price_level - b.price_level; // Min-heap
         }),
         bids: new Heap((a, b) => {
-            return b.price_level - a.price_level;
+            return b.price_level - a.price_level; // Max-heap
         })
     };
 }

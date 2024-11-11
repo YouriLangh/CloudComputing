@@ -51,7 +51,6 @@ async function consumeAndForwardOrders() {
     // Start consuming messages
     channel.consume(ORDER_QUEUE, async (msg) => {
       if (msg !== null) {
-        lastMessageTime = Date.now(); // Reset the timer when a message is received
         const order = JSON.parse(msg.content.toString());
         const { price } = order;
 

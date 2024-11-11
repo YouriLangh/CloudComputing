@@ -2,6 +2,7 @@ const fs = require("fs");
 const split2 = require("split2");
 const amqp = require("amqplib");
 const assert = require("assert");
+const { set } = require("mongoose");
 
 async function streamOrders(cvs_filepath) {
   const connection = await amqp.connect("amqp://rabbitmq");
@@ -43,8 +44,10 @@ async function streamOrders(cvs_filepath) {
   await Promise.all(sendPromises);
 
   // Once all lines have been sent, close the connection
-  console.log("Finished streaming orders.");
-  connection.close();
+  console.log("Finished streaming orders.\nClosing connection in 5 seconds...");
+  setTimeout(() => {
+    connection.close();
+  }, 5000);
 }
 
 function parseLine(line) {

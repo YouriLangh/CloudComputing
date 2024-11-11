@@ -30,3 +30,14 @@ services:
     environment:
       - RABBITMQ_URLL=amqp://rabbitmq:5672
     restart: on-failure   # Restarts only if the container exits with a non-zero status
+
+  order_manager:
+    build: ./order_manager
+    depends_on:
+      rabbitmq:
+        condition: service_healthy # Wait for RabbitMQ to be healthy
+    environment:
+      - RABBITMQ_URLL=amqp://rabbitmq:5672
+    restart: on-failure   # Restarts only if the container exits with a non-zero status
+    volumes:
+      - ./matching-engine:/app/matching-engine  # Mount matching-engine folder
