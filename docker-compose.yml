@@ -10,7 +10,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: always
 
   client_order_streamer:
     build: ./client_order_streamer
@@ -19,7 +18,7 @@ services:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
-    restart: always
+    restart: on-failure   # Restarts only if the container exits with a non-zero status
     volumes:
       - ./client_order_streamer/data:/app/data
 
@@ -30,4 +29,4 @@ services:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
       - RABBITMQ_URLL=amqp://rabbitmq:5672
-    restart: always
+    restart: on-failure   # Restarts only if the container exits with a non-zero status
