@@ -1,12 +1,14 @@
 const amqp = require("amqplib");
-const { Kafka } = require("kafkajs");
+const { Kafka, Partitioners } = require("kafkajs");
 const { MatchingEngine, EngineOrder } = require("/app/matching-engine");
 
 let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
 // Kafka setup
 const kafka = new Kafka({ brokers: ["kafka:9092"] });
-const producer = kafka.producer();
+const producer = kafka.producer({
+  createPartitioner: Partitioners.LegacyPartitioner,
+});
 
 const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
 const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
@@ -25,13 +27,23 @@ async function executionHandler(ask_executions, bid_executions) {
   for (const execution of ask_executions) {
     await producer.send({
       topic: "order_fills",
-      messages: [{ key: execution.symbol, value: JSON.stringify({ ...execution, type: "ask" }) }],
+      messages: [
+        {
+          key: execution.symbol,
+          value: JSON.stringify({ ...execution, type: "ask" }),
+        },
+      ],
     });
   }
   for (const execution of bid_executions) {
     await producer.send({
       topic: "order_fills",
-      messages: [{ key: execution.symbol, value: JSON.stringify({ ...execution, type: "bid" }) }],
+      messages: [
+        {
+          key: execution.symbol,
+          value: JSON.stringify({ ...execution, type: "bid" }),
+        },
+      ],
     });
   }
 }
@@ -59,9 +71,7 @@ async function consumeAndForwardOrders() {
     // Start consuming messages
     channel.consume(ORDER_MANAGER_QUEUE, async (msg) => {
       if (msg !== null) {
-        const rawOrder = JSON.parse(
-          msg.content.toString()
-        );
+        const rawOrder = JSON.parse(msg.content.toString());
 
         const processedOrder = processOrder(rawOrder);
 
@@ -70,7 +80,12 @@ async function consumeAndForwardOrders() {
         await producer.send({
           topic: "orders",
           // partition by symbol to ensure orders of the same symbol are processed in order
-          messages: [{key: processedOrder.symbol, value: JSON.stringify(processedOrder) }],
+          messages: [
+            {
+              key: processedOrder.symbol,
+              value: JSON.stringify(processedOrder),
+            },
+          ],
         });
 
         // Create an EngineOrder instance from the parsed data
