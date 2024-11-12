@@ -29,34 +29,14 @@ async function startMarketDataPublisher() {
 
 function processOrder(data) {
     const { price, symbol, quantity, order_type, id } = data
-    const order = new EngineOrder(
-        symbol,
-        order_type,
-        parseFloat(price),
-        parseInt(quantity),
-        id
-    );
-    if(order.order_type === 'ask'){
-        // Process ask order
-        console.log("Processing ask order for dashboard:", order);
-    } else {
-        // Process bid order
-    }
   // Process new order data for the order book or any real-time UI updates
-  console.log("Processing order for dashboard:", order);
+  console.log("Processing order for dashboard:", data);
   publishToDashboard(order, "order");
 }
 
 function processFill(data) {
     const { price, symbol, quantity, order_type, id } = data
-    const order = new EngineOrder(
-        symbol,
-        order_type,
-        parseFloat(price),
-        parseInt(quantity),
-        id
-    );
-  console.log('Processing fill for dashboard:', order);
+  console.log('Processing fill for dashboard:', data);
 
 }
 
