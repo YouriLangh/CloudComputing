@@ -36,7 +36,6 @@ async function executionHandler(ask_executions, bid_executions) {
 const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
 const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
 
-// TODO: why does this start at 1 and not 2?
 class SequentialNumberGenerator {
   constructor(start = 1) {
     this.current = start;
@@ -60,24 +59,28 @@ async function consumeAndForwardOrders() {
     // Start consuming messages
     channel.consume(ORDER_MANAGER_QUEUE, async (msg) => {
       if (msg !== null) {
-        const { price, symbol, quantity, order_type } = JSON.parse(
+        const rawOrder = JSON.parse(
           msg.content.toString()
         );
 
-        // Create an EngineOrder instance from the parsed data
-        const order = new EngineOrder(
-          symbol,
-          order_type,
-          parseFloat(price),
-          parseInt(quantity),
-          seqGen.getNext()
-        );
+        const processedOrder = processOrder(rawOrder);
 
         // console.log(`Order received: ${order.side} ${order.quantity} of ${order.symbol} at ${order.price}`);
+
         await producer.send({
           topic: "orders",
-          messages: [{ value: JSON.stringify(order) }],
+          // partition by symbol to ensure orders of the same symbol are processed in order
+          messages: [{key: processedOrder.symbol, value: JSON.stringify(processedOrder) }],
         });
+
+        // Create an EngineOrder instance from the parsed data
+        const order = new EngineOrder(
+          processedOrder.symbol,
+          processedOrder.order_type,
+          processedOrder.price,
+          processedOrder.quantity,
+          processedOrder.id
+        );
 
         matchingEngine.execute(order, executionHandler);
 
@@ -88,6 +91,16 @@ async function consumeAndForwardOrders() {
   } catch (error) {
     console.error("Failed to consume and forward orders:", error);
   }
+}
+
+function processOrder(order) {
+  order.id = seqGen.getNext();
+  order.price = parseFloat(order.price);
+  order.quantity = parseInt(order.quantity);
+  delete order.user_id;
+  delete order.timestamp_ns;
+  delete order.trader_type;
+  return order;
 }
 
 // Connect to Kafka and start consuming orders

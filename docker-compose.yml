@@ -81,3 +81,5 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
     restart: on-failure
+    volumes:
+      - ./matching-engine:/app/matching-engine # Mount matching-engine folder
