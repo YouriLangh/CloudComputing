@@ -2,7 +2,6 @@ const fs = require("fs");
 const split2 = require("split2");
 const amqp = require("amqplib");
 const assert = require("assert");
-const { set } = require("mongoose");
 
 async function streamOrders(cvs_filepath) {
   const connection = await amqp.connect("amqp://rabbitmq");
