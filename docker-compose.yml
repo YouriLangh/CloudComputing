@@ -5,7 +5,7 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq2
     environment:
-      - RABBITMQ_LOGS=info  # Set to 'warning' or 'error' for less verbosity
+      - RABBITMQ_LOGS=error # Set to 'warning' or 'error' for less verbosity
     ports:
       - "15672:15672" # RabbitMQ Management UI
       - "5672:5672" # AMQP port for RabbitMQ consumers/producers
@@ -88,4 +88,5 @@ services:
       - "8080:8080" # Expose the WebSocket server
   dashboard:
     build: ./exchange_dashboard
-    ports: "5000:80"
+    ports:
+      - "5000:80"
