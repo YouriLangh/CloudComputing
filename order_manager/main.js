@@ -8,6 +8,9 @@ let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 const kafka = new Kafka({ brokers: ["kafka:9092"] });
 const producer = kafka.producer();
 
+const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
+const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
+
 async function connectKafkaProducer() {
   await producer.connect();
   console.log("Connected to Kafka producer.");
@@ -15,26 +18,23 @@ async function connectKafkaProducer() {
 
 // Execution handler for the matching engine
 async function executionHandler(ask_executions, bid_executions) {
-  // console.log("Ask executions:", ask_executions);
-  // console.log("Bid executions:", bid_executions);
+  console.log("Ask executions:", ask_executions);
+  console.log("Bid executions:", bid_executions);
 
   // Publish executions to Kafka Streams
   for (const execution of ask_executions) {
     await producer.send({
       topic: "order_fills",
-      messages: [{ value: JSON.stringify({ ...execution, type: "ask" }) }],
+      messages: [{ key: execution.symbol, value: JSON.stringify({ ...execution, type: "ask" }) }],
     });
   }
   for (const execution of bid_executions) {
     await producer.send({
       topic: "order_fills",
-      messages: [{ value: JSON.stringify({ ...execution, type: "bid" }) }],
+      messages: [{ key: execution.symbol, value: JSON.stringify({ ...execution, type: "bid" }) }],
     });
   }
 }
-
-const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
-const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
 
 class SequentialNumberGenerator {
   constructor(start = 1) {
