@@ -89,4 +89,6 @@ services:
   dashboard:
     build: ./exchange_dashboard
     ports:
-      - "5000:80"
+      - "80:80"
+    environment:
+      - NODE_ENV=production
