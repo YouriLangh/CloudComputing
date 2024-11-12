@@ -2,6 +2,26 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+const socket = new WebSocket("ws://market-data-publisher:8080");
+
+socket.onopen = () => {
+  console.log("Connected to the WebSocket server");
+};
+
+socket.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  if (message.type === "order") {
+    // Handle the new order data
+    console.log("New order:", message.data);
+  } else if (message.type === "fill") {
+    // Handle the execution fill data
+    console.log("New fill:", message.data);
+  }
+};
+
+socket.onclose = () => {
+  console.log("Disconnected from WebSocket server");
+};
 
 function App() {
   const [count, setCount] = useState(0)

@@ -84,3 +84,8 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
     restart: on-failure
+    ports:
+      - "8080:8080" # Expose the WebSocket server
+  dashboard:
+    build: ./dashboard
+    ports: "5000:5000"
