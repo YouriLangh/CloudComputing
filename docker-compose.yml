@@ -4,6 +4,8 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq2
+    environment:
+      - RABBITMQ_LOGS=info  # Set to 'warning' or 'error' for less verbosity
     ports:
       - "15672:15672" # RabbitMQ Management UI
       - "5672:5672" # AMQP port for RabbitMQ consumers/producers
@@ -29,6 +31,7 @@ services:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
       - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_LOG4J_LOGGERS=org.apache.kafka=ERROR,org.apache.zookeeper=ERROR
     ports:
       - "9092:9092" # Kafka default port
     depends_on:

@@ -31,7 +31,7 @@ function processOrder(data) {
     const { price, symbol, quantity, order_type, id } = data
   // Process new order data for the order book or any real-time UI updates
   console.log("Processing order for dashboard:", data);
-  publishToDashboard(order, "order");
+//   publishToDashboard(order, "order");
 }
 
 function processFill(data) {
