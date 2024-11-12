@@ -1,27 +1,18 @@
 const { Kafka } = require("kafkajs");
 const WebSocket = require("ws");
+const { OrderBook, Order } = require("/app/orderbook");
 
 const kafka = new Kafka({ brokers: ["kafka:9092"] });
 const consumer = kafka.consumer({ groupId: "market_data_group" });
 
-let orderBook = {
-    bids: [
-      { price: 150, quantity: 100 },
-      { price: 149, quantity: 50 }
-    ],
-    asks: [
-      { price: 151, quantity: 100 },
-      { price: 152, quantity: 200 }
-    ]
-  };
+let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
+
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
 
 // Store all WebSocket connections
 const clients = new Set();
 
-// TODO: Implement order book management
-// TODO: Order of order fills is not guaranteed
 // TODO: order_manager kafka producer has warning as it does not use our partitioner?
 // TODO: Multiple order books exist for different symbols
 // TODO: decide what data to send to the dashboard
@@ -44,8 +35,8 @@ async function startMarketDataPublisher() {
   await consumer.connect();
 
   // Subscribe to both 'orders' and 'order_fills' topics
-  await consumer.subscribe({ topic: "orders", fromBeginning: true }); // in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
-  await consumer.subscribe({ topic: "order_fills", fromBeginning: true });
+  await consumer.subscribe({ topic: "orders" }); //, fromBeginning: true });  in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
+  await consumer.subscribe({ topic: "order_fills" }); //, fromBeginning: true });
 
   console.log("Market Data Publisher is now consuming from Kafka topics...");
 
@@ -67,7 +58,8 @@ async function startMarketDataPublisher() {
 function processOrder(data) {
   const { price, symbol, quantity, order_type, id } = data;
   console.log("Processing order for dashboard:", data);
-
+  const order = new Order(symbol, order_type, price, quantity, id);
+  orderBook.addOrder(order);
   // Publish to all WebSocket clients
   publishToDashboard(data, "order");
 }
@@ -75,9 +67,10 @@ function processOrder(data) {
 function processFill(data) {
   const { price, symbol, quantity, order_type, id } = data;
   console.log("Processing fill for dashboard:", data);
+  orderBook.removeTopQuantity(symbol, order_type, quantity);
 
   // Publish to all WebSocket clients
-  // publishToDashboard(data, "fill");
+  publishToDashboard(data, "fill");
 }
 
 function publishToDashboard(data, type) {
