@@ -87,5 +87,5 @@ services:
     ports:
       - "8080:8080" # Expose the WebSocket server
   dashboard:
-    build: ./dashboard
-    ports: "5000:5000"
+    build: ./exchange_dashboard
+    ports: "5000:80"
