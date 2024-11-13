@@ -37,33 +37,42 @@ class OrderBook {
   }
 
   adjustOrRemoveOrder(symbol, side, secnum, quantityToRemove) {
-    const orderBookSide = this.symbol_order_book_map.get(symbol);
+    const orderBookSide = this.symbol_order_book.symbol_order_book_map.get(symbol);
     if (!orderBookSide) return;
 
     const heap = side === "ask" ? orderBookSide.asks : orderBookSide.bids;
-    console.log("orderbook before delete: ", JSON.stringify(orderBookSide));
-    const orderIndex = heap
-      .toArray()
-      .findIndex((order) => order.secnum === secnum);
+    let orderIndex = this.findOrderIndex(heap, secnum);
 
     if (orderIndex === -1) {
       console.log(`Order with secnum ${secnum} not found.`);
       return;
     }
 
-    const order = heap.toArray()[orderIndex];
-
-    // Adjust the quantity
+    // Adjust quantity
+    const order = heap.nodes[orderIndex].order;
     if (order.quantity > quantityToRemove) {
       order.quantity -= quantityToRemove;
-      heap.heapify(); // Re-heapify to maintain heap structure
     } else {
-      // If quantity reaches zero, remove the order from the heap
-      heap.toArray().splice(orderIndex, 1);
-      heap.heapify(); // Re-heapify after removing
+      // Remove order by replacing it with the last element, pop, and re-heapify
+      heap.nodes[orderIndex] = heap.nodes[heap.size() - 1];
+      heap.pop();
+      heap._heapifyUp(orderIndex);
+      heap._heapifyDown(orderIndex);
     }
-    console.log("orderbook after delete: ", JSON.stringify(orderBookSide));
+
+    console.log("Order book after adjustment: ", JSON.stringify(this.symbol_order_book.toJSON()));
   }
+
+  // Helper function to find the index of an order by secnum in the heap
+  findOrderIndex(heap, secnum) {
+    for (let i = 0; i < heap.size(); i++) {
+      if (heap.nodes[i].order.secnum === secnum) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
 
   toJSON() {
     const orderBookJSON = {};
