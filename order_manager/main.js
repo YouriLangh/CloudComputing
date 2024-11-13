@@ -22,29 +22,24 @@ async function connectKafkaProducer() {
 async function executionHandler(ask_executions, bid_executions) {
   console.log("ask executions: ", ask_executions);
   console.log("bid executions: ", bid_executions);
-  // Publish executions to Kafka Streams
-  for (const execution of ask_executions) {
-    await producer.send({
-      topic: "order_fills",
-      messages: [
-        {
-          key: execution.symbol,
-          value: JSON.stringify({ ...execution, type: "ask" }),
-        },
-      ],
-    });
-  }
-  for (const execution of bid_executions) {
-    await producer.send({
-      topic: "order_fills",
-      messages: [
-        {
-          key: execution.symbol,
-          value: JSON.stringify({ ...execution, type: "bid" }),
-        },
-      ],
-    });
-  }
+
+  // Combine ask and bid executions into a single list of messages
+  const messages = [
+    ...ask_executions.map((execution) => ({
+      key: execution.symbol,
+      value: JSON.stringify({ ...execution, type: "ask" }),
+    })),
+    ...bid_executions.map((execution) => ({
+      key: execution.symbol,
+      value: JSON.stringify({ ...execution, type: "bid" }),
+    })),
+  ];
+
+  // Send all messages in a single batch
+  await producer.send({
+    topic: "order_fills",
+    messages,
+  });
 }
 
 class SequentialNumberGenerator {
