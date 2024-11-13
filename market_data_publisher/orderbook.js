@@ -64,6 +64,17 @@ class OrderBook {
         }
         console.log("orderbook after delete: ", heap);
     }
+
+    toJSON() {
+        const orderBookJSON = {};
+        for (const [symbol, { asks, bids }] of this.symbol_order_book_map) {
+            orderBookJSON[symbol] = {
+                asks: asks.toArray(),
+                bids: bids.toArray()
+            };
+        }
+        return orderBookJSON;
+    }
 }
 
 

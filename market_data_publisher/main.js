@@ -23,7 +23,8 @@ wss.on("listening", () => {
 wss.on("connection", (ws) => {
   console.log("New client connected");
   clients.add(ws);
-  ws.send(JSON.stringify(orderBook)); // send the current order book to them
+  console.log("Sending current order book to new client...", orderBook.toJSON());
+  ws.send(JSON.stringify(orderBook.toJSON())); // send the current order book to them
 
   // Remove client from the set when they disconnect
   ws.on("close", () => {
