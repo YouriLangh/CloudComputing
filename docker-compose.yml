@@ -23,6 +23,24 @@ services:
     restart: always
     ports:
       - "2181:2181" # Zookeeper default port
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "echo",
+          "ruok",
+          "|",
+          "nc",
+          "localhost",
+          "2181",
+          "|",
+          "grep",
+          "imok",
+        ]
+      interval: 30s # Time between health checks
+      timeout: 5s # Time to wait for a response
+      retries: 3 # Number of retries before marking as unhealthy
+      start_period: 10s # Delay before starting the health check
 
   kafka:
     image: bitnami/kafka:latest
@@ -83,6 +101,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy # Wait for Kafka to be healthy
+      zookeeper:
+        condition: service_healthy
     environment:
       - KAFKA_BROKER=kafka:9092
     restart: on-failure

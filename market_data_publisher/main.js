@@ -49,26 +49,29 @@ async function startMarketDataPublisher() {
       const data = JSON.parse(message.value.toString());
 
       if (topic === "orders") {
-        processOrder(data);
+        console.log(
+          `Order received: ${data.side} ${data.quantity} of ${data.symbol} at ${data.price} of ${data.secnum}`
+        );
+        processOrder(data); // Ensure processOrder is synchronous
       } else if (topic === "order_fills") {
         console.log("Received execution fill:", data);
-        processFill(data);
+        processFill(data); // Ensure processFill is synchronous
       }
     },
   });
 }
 
 function processOrder(data) {
-  const { price, symbol, quantity, order_type, secnum } = data;
-  const order = new Order(order_type, price, quantity, secnum);
+  const { price, symbol, quantity, side, secnum } = data;
+  const order = new Order(side, price, quantity, secnum);
   orderBook.addOrder(symbol, order);
   // Publish to all WebSocket clients
   publishToDashboard(data, "order");
 }
 
 function processFill(data) {
-  const { price, symbol, quantity, order_type, secnum } = data;
-  orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
+  const { price, symbol, quantity, side, secnum } = data;
+  orderBook.adjustOrRemoveOrder(symbol, side, secnum, quantity);
   // Publish to all WebSocket clients
   publishToDashboard(orderBook.toJSON(), "orderBook");
 }

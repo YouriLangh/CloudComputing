@@ -63,48 +63,60 @@ async function consumeAndForwardOrders() {
   try {
     const connection = await amqp.connect(RABBITMQ_URL);
     const channel = await connection.createChannel();
-
     await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
+
     console.log("Order manager is now consuming orders from RabbitMQ...");
 
-    // Start consuming messages
+    const orderQueue = [];
+    let processing = false;
+
     channel.consume(ORDER_MANAGER_QUEUE, async (msg) => {
       if (msg !== null) {
         const rawOrder = JSON.parse(msg.content.toString());
+        orderQueue.push({ msg, rawOrder }); // Queue each message
 
-        const processedOrder = processOrder(rawOrder);
-
-        console.log(`Order received: ${processedOrder.order_type} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`);
-
-        await producer.send({
-          topic: "orders",
-          // partition by symbol to ensure orders of the same symbol are processed in order
-          messages: [
-            {
-              key: processedOrder.symbol,
-              value: JSON.stringify(processedOrder),
-            },
-          ],
-        });
-
-        // Create an EngineOrder instance from the parsed data
-        const order = new EngineOrder(
-          processedOrder.symbol,
-          processedOrder.order_type,
-          processedOrder.price,
-          processedOrder.quantity,
-          processedOrder.secnum
-        );
-
-        matchingEngine.execute(order, executionHandler);
-
-        // Acknowledge the message upon successful processing
-        channel.ack(msg);
+        if (!processing) {
+          processOrderQueue();
+        }
       }
     });
+
+    async function processOrderQueue() {
+      processing = true;
+      while (orderQueue.length > 0) {
+        const { msg, rawOrder } = orderQueue.shift();
+        await processAndAcknowledgeOrder(msg, rawOrder, channel);
+      }
+      processing = false;
+    }
   } catch (error) {
     console.error("Failed to consume and forward orders:", error);
   }
+}
+
+async function processAndAcknowledgeOrder(msg, rawOrder, channel) {
+  const processedOrder = processOrder(rawOrder);
+  console.log(
+    `Order received: ${processedOrder.order_type} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`
+  );
+
+  await producer.send({
+    topic: "orders",
+    messages: [
+      { key: processedOrder.symbol, value: JSON.stringify(processedOrder) },
+    ],
+  });
+
+  const order = new EngineOrder(
+    processedOrder.symbol,
+    processedOrder.order_type,
+    processedOrder.price,
+    processedOrder.quantity,
+    processedOrder.secnum
+  );
+
+  matchingEngine.execute(order, executionHandler);
+  channel.ack(msg);
 }
 
 function processOrder(order) {
