@@ -1,7 +1,7 @@
 // src/hooks/useWebSocket.js
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
-const useWebSocket = (url, setOrderBookData) => {
+const useWebSocket = (url, setOrderBookData, setPriceEvolutionData) => {
   useEffect(() => {
     const ws = new WebSocket(url);
 
@@ -27,7 +27,6 @@ const useWebSocket = (url, setOrderBookData) => {
       ws.close(); // Cleanup on component unmount
     };
   }, [url, setOrderBookData]); // Dependency on setOrderBookData
-
 };
 
 export default useWebSocket;

@@ -6,17 +6,18 @@ import OrderBookChart from "./OrderBookChart";
 const Dashboard = () => {
   // Use the environment variable URL or default to localhost for WebSocket
   const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:8080";
-  
+
   // State to store the order book data
   const [orderBookData, setOrderBookData] = useState({});
   const [priceEvolutionData, setPriceEvolutionData] = useState({});
 
   // Use the WebSocket hook and pass setOrderBookData to it
-  useWebSocket(wsUrl, setOrderBookData);
+  useWebSocket(wsUrl, setOrderBookData, setPriceEvolutionData);
 
   return (
     <div>
       <h2>Order Book Dashboard</h2>
+      <span>{priceEvolutionData && JSON.stringify(priceEvolutionData)}</span>
       <div>
         <h3>Real-Time Updates</h3>
         <OrderBookChart orderBookData={orderBookData} />
