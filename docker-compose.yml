@@ -86,10 +86,3 @@ services:
     restart: on-failure
     ports:
       - "8080:8080" # Expose the WebSocket server
-  dashboard:
-    build: ./exchange_dashboard
-    ports:
-      - "80:80"
-    environment:
-      - NODE_ENV=production
-      - MDP_WS_URL=ws://market_data_publisher:8080 # WebSocket URL for Dashboard to connect
