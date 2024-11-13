@@ -19,6 +19,17 @@ async function connectKafkaProducer() {
 // Message stream (subject) for order events
 const orderStream = new Subject();  // A stream to push new orders
 
+class SequentialNumberGenerator {
+  constructor(start = 1) {
+    this.current = start;
+  }
+
+  getNext() {
+    return this.current++; // returns the current number and then increments
+  }
+}
+const seqGen = new SequentialNumberGenerator();
+
 // Kafka consumer for orders
 async function consumeAndForwardOrders() {
   try {
