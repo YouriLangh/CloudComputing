@@ -70,8 +70,8 @@ function processOrder(data) {
 }
 
 function processFill(data) {
-  const { price, symbol, quantity, side, secnum } = data;
-  orderBook.adjustOrRemoveOrder(symbol, side, secnum, quantity);
+  const { price, symbol, quantity, order_type, secnum } = data;
+  orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
   // Publish to all WebSocket clients
   publishToDashboard(orderBook.toJSON(), "orderBook");
 }
