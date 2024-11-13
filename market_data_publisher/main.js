@@ -66,8 +66,8 @@ async function startMarketDataPublisher() {
 function processOrder(data) {
   const { price, symbol, quantity, order_type, secnum } = data;
   console.log("Processing order for dashboard:", data);
-  const order = new Order(symbol, order_type, price, quantity, secnum);
-  orderBook.addOrder(order);
+  const order = new Order(order_type, price, quantity, secnum);
+  orderBook.addOrder(symbol, order);
   // Publish to all WebSocket clients
   publishToDashboard(data, "order");
 }
