@@ -13,7 +13,9 @@ const wss = new WebSocket.Server({ port: 8080 });
 // Store all WebSocket connections
 const clients = new Set();
 wss.on("listening", () => {
-  console.log("WebSocket server is now open and listening on ws://localhost:8080");
+  console.log(
+    "WebSocket server is now open and listening on ws://localhost:8080"
+  );
 });
 
 // TODO: decide what data to send to the dashboard
@@ -23,7 +25,10 @@ wss.on("listening", () => {
 wss.on("connection", (ws) => {
   console.log("New client connected");
   clients.add(ws);
-  console.log("Sending current order book to new client...", orderBook.toJSON());
+  console.log(
+    "Sending current order book to new client...",
+    orderBook.toJSON()
+  );
   ws.send(JSON.stringify(orderBook.toJSON())); // send the current order book to them
 
   // Remove client from the set when they disconnect
@@ -83,11 +88,5 @@ function publishToDashboard(data, type) {
     }
   });
 }
-
-setInterval(() => {
-  const dummyData = { symbol: "AAPL", price: Math.random() * 100, quantity: 10 };
-  publishToDashboard(dummyData, "test");
-}, 1000); // Every 1 second
-
 
 startMarketDataPublisher();
