@@ -9,36 +9,48 @@ function App() {
   // State to store orders and fills
   const [orders, setOrders] = useState([]);
   const [fills, setFills] = useState([]);
-
+  const wsUrl = import.meta.env.VITE_MDP_WS_URL || "ws://localhost:8080";
     // WebSocket event listeners
     socket.onopen = () => {
       console.log("Connected to the WebSocket server");
     };
 
-    socket.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === "order") {
-        // Update the orders state with the new order data
-        setOrders((prevOrders) => [...prevOrders, message.data]);
-        console.log("New order:", message.data);
-      } else if (message.type === "fill") {
-        // Update the fills state with the new fill data
-        setFills((prevFills) => [...prevFills, message.data]);
-        console.log("New fill:", message.data);
-      }
-    };
+    useEffect(() => {
+      const ws = new WebSocket(wsUrl);
+  
+      ws.onopen = () => {
+        console.log("Connected to Market Data Publisher WebSocket");
+      };
+  
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+  
+        if (message.type === "order") {
+          handleNewOrder(message.data);
+        } else if (message.type === "fill") {
+          handleOrderFill(message.data);
+        }
+      };
+  
+      ws.onclose = () => {
+        console.log("Disconnected from Market Data Publisher WebSocket");
+      };
+  
+      return () => {
+        ws.close(); // Cleanup WebSocket connection on component unmount
+      };
+    }, [wsUrl]);
 
-    socket.onclose = () => {
-      console.log("Disconnected from WebSocket server");
-    };
-
-  useEffect(() => {
-
-    // Cleanup function to close WebSocket connection when component unmounts
-    return () => {
-      socket.close();
-    };
-  }, []);
+    function handleNewOrder(order) {
+      console.log("New order received:", order);
+      // Update order book visualization
+  }
+  
+  function handleOrderFill(fill) {
+      console.log("Order fill received:", fill);
+      // Update order book or chart with the fill data
+  }
+  
 
   return (
     <div>
