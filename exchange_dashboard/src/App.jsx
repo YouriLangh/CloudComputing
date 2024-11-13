@@ -1,16 +1,15 @@
-import { useState, useEffect } from 'react';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
-import './App.css';
+import { useState, useEffect } from "react";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "/vite.svg";
+import "./App.css";
 
-const socket = new WebSocket("ws://market-data-publisher:8080");
+const socket = new WebSocket("ws://market_data_publisher:8080");
 
 function App() {
   // State to store orders and fills
   const [orders, setOrders] = useState([]);
   const [fills, setFills] = useState([]);
 
-  useEffect(() => {
     // WebSocket event listeners
     socket.onopen = () => {
       console.log("Connected to the WebSocket server");
@@ -32,6 +31,8 @@ function App() {
     socket.onclose = () => {
       console.log("Disconnected from WebSocket server");
     };
+
+  useEffect(() => {
 
     // Cleanup function to close WebSocket connection when component unmounts
     return () => {

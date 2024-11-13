@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "heap": "^0.2.7",
     "kafkajs": "^2.2.4",
     "ws": "^8.18.0"
   }

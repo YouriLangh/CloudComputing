@@ -5,15 +5,15 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq2
     environment:
-      - RABBITMQ_LOGS=error # Set to 'warning' or 'error' for less verbosity
+      - RABBITMQ_LOGS=error # Setting logs to 'error' for less verbosity
     ports:
       - "15672:15672" # RabbitMQ Management UI
       - "5672:5672" # AMQP port for RabbitMQ consumers/producers
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 5s
-      timeout: 5s
-      retries: 5
+      timeout: 60s
+      retries: 12
 
   zookeeper:
     image: bitnami/zookeeper:latest
