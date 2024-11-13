@@ -17,6 +17,11 @@ const OrderBookChart = ({ orderBookData }) => {
   const prepareChartData = (symbol) => {
     const orderBook = orderBookData[symbol];
 
+    // Check if orderBook exists for the selected symbol
+    if (!orderBook) {
+      return []; // Return an empty array if no data is available
+    }
+
     // Prepare bid and ask data
     const bidData = orderBook.bids.map((bid) => ({
       price: bid.price,
@@ -51,9 +56,15 @@ const OrderBookChart = ({ orderBookData }) => {
 
       <div style={{ width: "100%", height: "400px" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <BarChart
+            data={chartData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="price" tickFormatter={(value) => value.toFixed(2)} />
+            <XAxis
+              dataKey="price"
+              tickFormatter={(value) => value.toFixed(2)}
+            />
             <YAxis />
             <Tooltip />
             <Legend />
@@ -63,6 +74,7 @@ const OrderBookChart = ({ orderBookData }) => {
               barSize={20}
               radius={[5, 5, 0, 0]}
               data={chartData.filter((item) => item.side === "Bid")}
+              name="Bids"
             />
             <Bar
               dataKey="quantity"
@@ -70,6 +82,7 @@ const OrderBookChart = ({ orderBookData }) => {
               barSize={20}
               radius={[5, 5, 0, 0]}
               data={chartData.filter((item) => item.side === "Ask")}
+              name="Asks"
             />
           </BarChart>
         </ResponsiveContainer>
