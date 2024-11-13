@@ -70,7 +70,7 @@ function processFill(data) {
   const { price, symbol, quantity, order_type, id } = data;
   console.log("Processing fill for dashboard:", data);
   console.log("orderbook before delete: ", orderBook);
-  orderBook.removeTopQuantity(symbol, order_type, quantity);
+  orderBook.adjustOrRemoveOrder(symbol, order_type, id, quantity);
   console.log("orderbook before delete: ", orderBook);
   // Publish to all WebSocket clients
   publishToDashboard(data, "fill");

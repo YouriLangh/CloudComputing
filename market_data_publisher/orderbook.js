@@ -37,23 +37,29 @@ class OrderBook {
         }
     }
 
-    // Remove specific quantities from the top of the heap
-    removeTopQuantity(symbol, side, quantityToRemove) {
+    adjustOrRemoveOrder(symbol, side, secnum, quantityToRemove) {
         const orderBookSide = this.symbol_order_book_map.get(symbol);
         if (!orderBookSide) return;
 
         const heap = side === 'ask' ? orderBookSide.asks : orderBookSide.bids;
-        const topOrder = heap.peek();
-        if (!heap.empty() && topOrder.quantity <= quantityToRemove) {
-            // Remove the entire top order if quantity to remove is greater or equal
-            // Note: should never be smaller.
-            quantityToRemove -= topOrder.quantity;
-            heap.pop();
+        const orderIndex = heap.toArray().findIndex(order => order.secnum === secnum);
+
+        if (orderIndex === -1) {
+            console.log(`Order with secnum ${secnum} not found.`);
+            return;
+        }
+
+        const order = heap.toArray()[orderIndex];
+
+        // Adjust the quantity
+        if (order.quantity > quantityToRemove) {
+            order.quantity -= quantityToRemove;
+            heap.heapify(); // Re-heapify to maintain heap structure
         } else {
-            // Reduce the quantity of the top order
-            topOrder.quantity -= quantityToRemove;
-            quantityToRemove = 0;
-            }
+            // If quantity reaches zero, remove the order from the heap
+            heap.toArray().splice(orderIndex, 1);
+            heap.heapify(); // Re-heapify after removing
+        }
     }
 }
 
