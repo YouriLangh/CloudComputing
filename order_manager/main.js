@@ -74,7 +74,7 @@ async function consumeAndForwardOrders() {
 
         const processedOrder = processOrder(rawOrder);
 
-        // console.log(`Order received: ${order.side} ${order.quantity} of ${order.symbol} at ${order.price}`);
+        console.log(`Order received: ${processedOrder.side} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`);
 
         await producer.send({
           topic: "orders",

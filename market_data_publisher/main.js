@@ -22,10 +22,6 @@ wss.on("listening", () => {
 wss.on("connection", (ws) => {
   console.log("New client connected");
   clients.add(ws);
-  console.log(
-    "Sending current order book to new client...",
-    orderBook.toJSON()
-  );
   const message = JSON.stringify({
     type: "orderBook",
     data: orderBook.toJSON(),
@@ -53,7 +49,6 @@ async function startMarketDataPublisher() {
       const data = JSON.parse(message.value.toString());
 
       if (topic === "orders") {
-        console.log("Received new order:", data);
         processOrder(data);
       } else if (topic === "order_fills") {
         console.log("Received execution fill:", data);
@@ -65,7 +60,6 @@ async function startMarketDataPublisher() {
 
 function processOrder(data) {
   const { price, symbol, quantity, order_type, secnum } = data;
-  console.log("Processing order for dashboard:", data);
   const order = new Order(order_type, price, quantity, secnum);
   orderBook.addOrder(symbol, order);
   // Publish to all WebSocket clients
@@ -74,14 +68,12 @@ function processOrder(data) {
 
 function processFill(data) {
   const { price, symbol, quantity, order_type, secnum } = data;
-  console.log("Processing fill for dashboard:", data);
   orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
   // Publish to all WebSocket clients
   publishToDashboard(orderBook.toJSON(), "orderBook");
 }
 
 function publishToDashboard(data, type) {
-  console.log(`Publishing to WebSocket clients: ${type}`, data); // Debug log
   const message = JSON.stringify({ type: type, data: data });
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
