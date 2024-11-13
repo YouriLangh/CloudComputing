@@ -20,9 +20,6 @@ async function connectKafkaProducer() {
 
 // Execution handler for the matching engine
 async function executionHandler(ask_executions, bid_executions) {
-  console.log("Ask executions:", ask_executions);
-  console.log("Bid executions:", bid_executions);
-
   // Publish executions to Kafka Streams
   for (const execution of ask_executions) {
     await producer.send({

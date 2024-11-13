@@ -67,6 +67,7 @@ class MatchingEngine {
                     order.quantity = matched_elements.remaining_qtty;
                     current_book.bids.push({ price_level: order.price, order: order });
                 }
+                console.log("Book after matching (bid): ", current_book);
                 executionHandler(matched_elements.ask_executions, matched_elements.bid_executions);
             }
         } else {
@@ -83,6 +84,7 @@ class MatchingEngine {
                     order.quantity = matched_elements.remaining_qtty;
                     current_book.asks.push({ price_level: order.price, order: order });
                 }
+                console.log("Book after matching (ask): ", current_book);
                 executionHandler(matched_elements.ask_executions, matched_elements.bid_executions);
             }
         }

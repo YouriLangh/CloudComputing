@@ -1,32 +1,33 @@
 // src/hooks/useWebSocket.js
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-const useWebSocket = (url) => {
-    const [messages, setMessages] = useState([]);
+const useWebSocket = (url, setOrderBookData) => {
+  useEffect(() => {
+    const ws = new WebSocket(url);
 
-    useEffect(() => {
-        const ws = new WebSocket(url);
+    ws.onopen = () => {
+      console.log("Connected to WebSocket server");
+    };
 
-        ws.onopen = () => {
-            console.log("Connected to WebSocket server");
-        };
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      console.log("Received message from WebSocket server:", message);
 
-        ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            console.log("Received message from WebSocket server:", message);
-            setMessages((prevMessages) => [...prevMessages, message]);
-        };
+      if (message.type === "orderBook") {
+        setOrderBookData(message.data); // Update the order book data directly
+      } else if (message.type === "priceEvolution")
+        setPriceEvolutionData(message.data); // Update the price evolution data directly
+    };
 
-        ws.onclose = () => {
-            console.log("Disconnected from WebSocket server");
-        };
+    ws.onclose = () => {
+      console.log("Disconnected from WebSocket server");
+    };
 
-        return () => {
-            ws.close(); // Cleanup on component unmount
-        };
-    }, [url]);
+    return () => {
+      ws.close(); // Cleanup on component unmount
+    };
+  }, [url, setOrderBookData]); // Dependency on setOrderBookData
 
-    return messages;
 };
 
 export default useWebSocket;
