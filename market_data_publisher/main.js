@@ -134,6 +134,6 @@ function publishPriceEvolution() {
 
 setInterval(() => {
   publishPriceEvolution();
-}, 10000); // send evolution every 10s
+}, 60000); // send evolution every 10s
 
 startMarketDataPublisher();
