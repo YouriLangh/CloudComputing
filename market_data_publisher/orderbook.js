@@ -77,5 +77,4 @@ class OrderBook {
     }
 }
 
-
 module.exports = { OrderBook, Order };

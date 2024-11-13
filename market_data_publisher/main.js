@@ -76,7 +76,7 @@ function processFill(data) {
   console.log("Processing fill for dashboard:", data);
   orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
   // Publish to all WebSocket clients
-  publishToDashboard(data, "fill");
+  publishToDashboard(orderBook.toJSON(), "orderBook");
 }
 
 function publishToDashboard(data, type) {
@@ -89,4 +89,51 @@ function publishToDashboard(data, type) {
   });
 }
 
+function calculateDailyAveragePrice() {
+  const averagePrices = {};
+
+  // Loop through each symbol in the order book
+  for (const symbol of orderBook.symbol_order_book_map.keys()) {
+      const asks = orderBook.symbol_order_book_map.get(symbol).asks.toArray();
+      const bids = orderBook.symbol_order_book_map.get(symbol).bids.toArray();
+
+      // Calculate average ask price for the symbol
+      const avgAskPrice = asks.length > 0
+          ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
+          : 0;
+
+      // Calculate average bid price for the symbol
+      const avgBidPrice = bids.length > 0
+          ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
+          : 0;
+
+      // Store the average prices for the symbol
+      averagePrices[symbol] = { avgAskPrice, avgBidPrice };
+  }
+
+  return averagePrices;
+}
+
+
+function publishPriceEvolution() {
+  const symbolAverages = calculateDailyAveragePrice();
+  const message = JSON.stringify({
+    type: "priceEvolution",
+    data: symbolAverages,
+    timestamp: Date.now()
+  });
+
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+
+setInterval(() => {
+  publishPriceEvolution();
+}
+, 60000); // send evolution every minute
+  
 startMarketDataPublisher();

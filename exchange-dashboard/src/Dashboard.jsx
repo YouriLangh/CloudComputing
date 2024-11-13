@@ -15,10 +15,10 @@ const Dashboard = () => {
                 <ul>
                     {messages.map((msg, index) => (
                         <li key={index}>
-                            {msg.type === "order" ? (
-                                <span>New Order: {JSON.stringify(msg.data)}</span>
+                            {msg.type === "orderBook" ? (
+                                <span>New Orderbook: {JSON.stringify(msg.data)}</span>
                             ) : (
-                                <span>Order Fill: {JSON.stringify(msg.data)}</span>
+                                <span>Price Evolution: {JSON.stringify(msg.data)}</span>
                             )}
                         </li>
                     ))}
