@@ -41,7 +41,7 @@ class OrderBook {
     if (!orderBookSide) return;
 
     const heap = side === "ask" ? orderBookSide.asks : orderBookSide.bids;
-    console.log("orderbook before delete: ", heap);
+    console.log("orderbook before delete: ", JSON.stringify(heap));
     const orderIndex = heap
       .toArray()
       .findIndex((order) => order.secnum === secnum);
@@ -62,7 +62,7 @@ class OrderBook {
       heap.toArray().splice(orderIndex, 1);
       heap.heapify(); // Re-heapify after removing
     }
-    console.log("orderbook after delete: ", heap);
+    console.log("orderbook after delete: ", JSON.stringify(heap));
   }
 
   toJSON() {
