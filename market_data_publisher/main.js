@@ -39,8 +39,8 @@ async function startMarketDataPublisher() {
   await consumer.connect();
 
   // Subscribe to both 'orders' and 'order_fills' topics
-  await consumer.subscribe({ topic: "orders" }); //, fromBeginning: true });  in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
-  await consumer.subscribe({ topic: "order_fills" }); //, fromBeginning: true });
+  await consumer.subscribe({ topic: "orders", fromBeginning: true }); //in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
+  await consumer.subscribe({ topic: "order_fills", fromBeginning: true });
 
   console.log("Market Data Publisher is now consuming from Kafka topics...");
 
