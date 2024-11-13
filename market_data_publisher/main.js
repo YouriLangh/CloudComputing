@@ -15,8 +15,7 @@ const clients = new Set();
 wss.on("listening", () => {
   console.log("WebSocket server is now open and listening on ws://localhost:8080");
 });
-// TODO: order_manager kafka producer has warning as it does not use our partitioner?
-// TODO: Multiple order books exist for different symbols
+
 // TODO: decide what data to send to the dashboard
 // TODO: Where to add timestamps again??
 
