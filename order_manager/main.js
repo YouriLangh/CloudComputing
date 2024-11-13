@@ -23,17 +23,17 @@ async function executionHandler(ask_executions, bid_executions) {
   console.log("ask executions: ", ask_executions);
   console.log("bid executions: ", bid_executions);
 
-  // Combine ask and bid executions into a single list of messages
-  const messages = [
-    ...ask_executions.map((execution) => ({
-      key: execution.symbol,
-      value: JSON.stringify({ ...execution, type: "ask" }),
-    })),
-    ...bid_executions.map((execution) => ({
-      key: execution.symbol,
-      value: JSON.stringify({ ...execution, type: "bid" }),
-    })),
-  ];
+  // Append ask and bid executions into a single list
+  const all_executions = [...ask_executions, ...bid_executions];
+
+  // Map executions to messages, using the `order_type` to set the type
+  const messages = all_executions.map((execution) => ({
+    key: execution.symbol,
+    value: JSON.stringify({
+      ...execution,
+      type: execution.order_type, // Use `order_type` to get the side
+    }),
+  }));
 
   // Send all messages in a single batch
   await producer.send({
@@ -41,6 +41,7 @@ async function executionHandler(ask_executions, bid_executions) {
     messages,
   });
 }
+
 
 class SequentialNumberGenerator {
   constructor(start = 1) {
