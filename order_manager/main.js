@@ -94,7 +94,7 @@ async function consumeAndForwardOrders() {
           processedOrder.order_type,
           processedOrder.price,
           processedOrder.quantity,
-          processedOrder.id
+          processedOrder.secnum
         );
 
         matchingEngine.execute(order, executionHandler);
@@ -109,7 +109,7 @@ async function consumeAndForwardOrders() {
 }
 
 function processOrder(order) {
-  order.id = seqGen.getNext();
+  order.secnum = seqGen.getNext();
   order.price = parseFloat(order.price);
   order.quantity = parseInt(order.quantity);
   delete order.user_id;
