@@ -39,8 +39,8 @@ async function startMarketDataPublisher() {
   await consumer.connect();
 
   // Subscribe to both 'orders' and 'order_fills' topics
-  await consumer.subscribe({ topic: "orders" }); //, fromBeginning: true });  in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
-  await consumer.subscribe({ topic: "order_fills" }); //, fromBeginning: true });
+  await consumer.subscribe({ topic: "orders", fromBeginning: true }); //in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
+  await consumer.subscribe({ topic: "order_fills", fromBeginning: true });
 
   console.log("Market Data Publisher is now consuming from Kafka topics...");
 
@@ -50,7 +50,7 @@ async function startMarketDataPublisher() {
 
       if (topic === "orders") {
         console.log(
-          `Order received: ${data.side} ${data.quantity} of ${data.symbol} at ${data.price} of ${data.secnum}`
+          `Order received: ${data.order_type} ${data.quantity} of ${data.symbol} at ${data.price} of ${data.secnum}`
         );
         processOrder(data); // Ensure processOrder is synchronous
       } else if (topic === "order_fills") {
@@ -62,8 +62,8 @@ async function startMarketDataPublisher() {
 }
 
 function processOrder(data) {
-  const { price, symbol, quantity, side, secnum } = data;
-  const order = new Order(side, price, quantity, secnum);
+  const { price, symbol, quantity, order_type, secnum } = data;
+  const order = new Order(order_type, price, quantity, secnum);
   orderBook.addOrder(symbol, order);
   // Publish to all WebSocket clients
   publishToDashboard(data, "order");
