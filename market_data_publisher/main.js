@@ -74,17 +74,19 @@ function processFill(data) {
 }
 
 function publishToDashboard(data, type) {
-  // Broadcast the data to all connected WebSocket clients
-  const message = JSON.stringify({
-    type: type,
-    data: data,
-  });
-
+  console.log(`Publishing to WebSocket clients: ${type}`, data); // Debug log
+  const message = JSON.stringify({ type: type, data: data });
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
     }
   });
 }
+
+setInterval(() => {
+  const dummyData = { symbol: "AAPL", price: Math.random() * 100, quantity: 10 };
+  publishToDashboard(dummyData, "test");
+}, 1000); // Every 1 second
+
 
 startMarketDataPublisher();
