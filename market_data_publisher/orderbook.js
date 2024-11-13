@@ -38,10 +38,12 @@ class OrderBook {
     }
 
     adjustOrRemoveOrder(symbol, side, secnum, quantityToRemove) {
+        
         const orderBookSide = this.symbol_order_book_map.get(symbol);
         if (!orderBookSide) return;
 
         const heap = side === 'ask' ? orderBookSide.asks : orderBookSide.bids;
+        console.log("orderbook before delete: ", heap);
         const orderIndex = heap.toArray().findIndex(order => order.secnum === secnum);
 
         if (orderIndex === -1) {
@@ -60,6 +62,7 @@ class OrderBook {
             heap.toArray().splice(orderIndex, 1);
             heap.heapify(); // Re-heapify after removing
         }
+        console.log("orderbook after delete: ", heap);
     }
 }
 
