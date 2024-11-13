@@ -69,8 +69,8 @@ class OrderBook {
     const orderBookJSON = {};
     for (const [symbol, { asks, bids }] of this.symbol_order_book_map) {
       orderBookJSON[symbol] = {
-        asks: asks.toArray(),
-        bids: bids.toArray(),
+        asks: asks.toArray().sort((a, b) => a.price_level - b.price_level), // Ascending for asks
+        bids: bids.toArray().sort((a, b) => b.price_level - a.price_level), // Descending for bids
       };
     }
     return orderBookJSON;
