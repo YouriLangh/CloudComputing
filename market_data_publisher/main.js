@@ -3,7 +3,7 @@ const WebSocket = require("ws");
 const { OrderBook, Order } = require("/app/orderbook");
 
 const RABBITMQ_URL = "amqp://rabbitmq";
-const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue to consume messages
+const ORDERBOOK_QUEUE = "orderbook_exchange"; // RabbitMQ queue to consume messages
 
 let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
