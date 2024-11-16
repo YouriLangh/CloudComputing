@@ -1,34 +1,32 @@
-const { Kafka } = require("kafkajs");
+const amqp = require("amqplib");
 const WebSocket = require("ws");
 const { OrderBook, Order } = require("/app/orderbook");
 
-const kafka = new Kafka({ brokers: ["kafka:9092"] });
-const consumer = kafka.consumer({ groupId: "market_data_group" });
+const RABBITMQ_URL = "amqp://rabbitmq";
+const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue to consume messages
 
 let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
 
-// Store all WebSocket connections
+// Store active WebSocket connections
 const clients = new Set();
 wss.on("listening", () => {
-  console.log(
-    "WebSocket server is now open and listening on ws://localhost:8080"
-  );
+  console.log("WebSocket server listening on ws://localhost:8080");
 });
 
-// Handle new WebSocket connections
 wss.on("connection", (ws) => {
-  console.log("New client connected");
+  console.log("Client connected");
   clients.add(ws);
-  const message = JSON.stringify({
-    type: "orderBook",
-    data: orderBook.toJSON(),
-  });
-  ws.send(message); // send the current order book to them
 
-  // Remove client from the set when they disconnect
+  ws.send(
+    JSON.stringify({
+      type: "orderBook",
+      data: orderBook.toJSON(),
+    })
+  );
+
   ws.on("close", () => {
     console.log("Client disconnected");
     clients.delete(ws);
@@ -36,28 +34,33 @@ wss.on("connection", (ws) => {
 });
 
 async function startMarketDataPublisher() {
-  await consumer.connect();
+  const connection = await amqp.connect(RABBITMQ_URL);
+  const channel = await connection.createChannel();
 
-  // Subscribe to both 'orders' and 'order_fills' topics
-  await consumer.subscribe({ topic: "orders", fromBeginning: true }); //in case of crash, we want to start from the beginning : TODO: Might be better to rehydrate a log
-  await consumer.subscribe({ topic: "order_fills", fromBeginning: true });
+  // Assert the queue
+  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
 
-  console.log("Market Data Publisher is now consuming from Kafka topics...");
+  console.log("Market Data Publisher consuming from RabbitMQ...");
 
-  await consumer.run({
-    eachMessage: async ({ topic, partition, message }) => {
-      const data = JSON.parse(message.value.toString());
+  await channel.consume(ORDERBOOK_QUEUE, (msg) => {
+    if (msg !== null) {
+      const data = JSON.parse(msg.content.toString());
+      const { type, ...content } = data;
 
-      if (topic === "orders") {
+      if (type === "order") {
         console.log(
-          `Order received: ${data.order_type} ${data.quantity} of ${data.symbol} at ${data.price} of ${data.secnum}`
+          `Order: ${content.order_type} ${content.quantity} ${content.symbol} @ ${content.price} (${content.sequenceNumber})`
         );
-        processOrder(data); // Ensure processOrder is synchronous
-      } else if (topic === "order_fills") {
-        console.log("Received execution fill:", data);
-        processFill(data); // Ensure processFill is synchronous
+        processOrder(content);
+      } else if (type === "execution") {
+        console.log(
+          `Execution: ${content.symbol} ${content.quantity} @ ${content.price} (${content.sequenceNumber})`
+        );
+        processExecution(content);
       }
-    },
+
+      channel.ack(msg); // Acknowledge the message
+    }
   });
 }
 
@@ -65,19 +68,17 @@ function processOrder(data) {
   const { price, symbol, quantity, order_type, secnum } = data;
   const order = new Order(order_type, price, quantity, secnum);
   orderBook.addOrder(symbol, order);
-  // Publish to all WebSocket clients
   publishToDashboard(data, "order");
 }
 
-function processFill(data) {
-  const { price, symbol, quantity, order_type, secnum } = data;
+function processExecution(data) {
+  const { symbol, order_type, secnum, quantity } = data;
   orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
-  // Publish to all WebSocket clients
   publishToDashboard(orderBook.toJSON(), "orderBook");
 }
 
 function publishToDashboard(data, type) {
-  const message = JSON.stringify({ type: type, data: data });
+  const message = JSON.stringify({ type, data });
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
@@ -86,37 +87,31 @@ function publishToDashboard(data, type) {
 }
 
 function calculateDailyAveragePrice() {
-  const averagePrices = {};
+  const averages = {};
 
-  // Loop through each symbol in the order book
   for (const symbol of orderBook.symbol_order_book_map.keys()) {
     const asks = orderBook.symbol_order_book_map.get(symbol).asks.toArray();
     const bids = orderBook.symbol_order_book_map.get(symbol).bids.toArray();
 
-    // Calculate average ask price for the symbol
-    const avgAskPrice =
-      asks.length > 0
-        ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
-        : 0;
+    const avgAskPrice = asks.length
+      ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
+      : 0;
 
-    // Calculate average bid price for the symbol
-    const avgBidPrice =
-      bids.length > 0
-        ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
-        : 0;
+    const avgBidPrice = bids.length
+      ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
+      : 0;
 
-    // Store the average prices for the symbol
-    averagePrices[symbol] = { avgAskPrice, avgBidPrice };
+    averages[symbol] = { avgAskPrice, avgBidPrice };
   }
 
-  return averagePrices;
+  return averages;
 }
 
 function publishPriceEvolution() {
-  const symbolAverages = calculateDailyAveragePrice();
+  const averages = calculateDailyAveragePrice();
   const message = JSON.stringify({
     type: "priceEvolution",
-    data: symbolAverages,
+    data: averages,
     timestamp: Date.now(),
   });
 
@@ -129,6 +124,6 @@ function publishPriceEvolution() {
 
 setInterval(() => {
   publishPriceEvolution();
-}, 60000); // send evolution every 10s
+}, 60000); // Send evolution every minute
 
 startMarketDataPublisher();

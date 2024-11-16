@@ -15,53 +15,6 @@ services:
       timeout: 60s
       retries: 12
 
-  zookeeper:
-    image: bitnami/zookeeper:latest
-    container_name: zookeeper
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-    restart: always
-    ports:
-      - "2181:2181" # Zookeeper default port
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "echo",
-          "ruok",
-          "|",
-          "nc",
-          "localhost",
-          "2181",
-          "|",
-          "grep",
-          "imok",
-        ]
-      interval: 30s # Time between health checks
-      timeout: 5s # Time to wait for a response
-      retries: 3 # Number of retries before marking as unhealthy
-      start_period: 10s # Delay before starting the health check
-
-  kafka:
-    image: bitnami/kafka:latest
-    container_name: kafka
-    environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - ALLOW_PLAINTEXT_LISTENER=yes
-      - KAFKA_LOG4J_LOGGERS=org.apache.kafka=ERROR,org.apache.zookeeper=ERROR
-    ports:
-      - "9092:9092" # Kafka default port
-    restart: always
-    depends_on:
-      - zookeeper
-    healthcheck:
-      test: kafka-topics.sh --list --bootstrap-server localhost:9092 || exit 1
-      interval: 5s
-      timeout: 60s
-      retries: 12
-
   client_order_streamer:
     build: ./client_order_streamer
     depends_on:
@@ -87,11 +40,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
-      kafka:
-        condition: service_healthy # Wait for Kafka to be healthy
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5672
-      - KAFKA_BROKER=kafka:9092
     restart: on-failure
     volumes:
       - ./matching-engine:/app/matching-engine # Mount matching-engine folder
@@ -99,12 +49,8 @@ services:
   market_data_publisher:
     build: ./market_data_publisher
     depends_on:
-      kafka:
-        condition: service_healthy # Wait for Kafka to be healthy
-      zookeeper:
-        condition: service_healthy
-    environment:
-      - KAFKA_BROKER=kafka:9092
+      rabbitmq:
+        condition: service_healthy # Wait for RabbitMQ to be healthy
     restart: on-failure
     ports:
       - "8080:8080" # Expose the WebSocket server
