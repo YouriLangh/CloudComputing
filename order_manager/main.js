@@ -1,47 +1,11 @@
 const amqp = require("amqplib");
-const { Kafka, Partitioners } = require("kafkajs");
 const { MatchingEngine, EngineOrder } = require("/app/matching-engine");
 
 let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
-// Kafka setup
-const kafka = new Kafka({ brokers: ["kafka:9092"] });
-const producer = kafka.producer({
-  createPartitioner: Partitioners.LegacyPartitioner,
-});
-
 const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
+const ORDERBOOK_EXCHANGE = "orderbook_exchange"; // Exchange for all messages (orders + executions)
 const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
-
-async function connectKafkaProducer() {
-  await producer.connect();
-  console.log("Connected to Kafka producer.");
-}
-
-// Execution handler for the matching engine
-async function executionHandler(ask_executions, bid_executions) {
-  console.log("ask executions: ", ask_executions);
-  console.log("bid executions: ", bid_executions);
-
-  // Append ask and bid executions into a single list
-  const all_executions = [...ask_executions, ...bid_executions];
-
-  // Map executions to messages, using the `order_type` to set the type
-  const messages = all_executions.map((execution) => ({
-    key: execution.symbol,
-    value: JSON.stringify({
-      ...execution,
-      type: execution.order_type, // Use `order_type` to get the side
-    }),
-  }));
-
-  // Send all messages in a single batch
-  await producer.send({
-    topic: "order_fills",
-    messages,
-  });
-}
-
 
 class SequentialNumberGenerator {
   constructor(start = 1) {
@@ -55,33 +19,73 @@ class SequentialNumberGenerator {
 
 const seqGen = new SequentialNumberGenerator();
 
-async function consumeAndForwardOrders() {
-  try {
-    const connection = await amqp.connect(RABBITMQ_URL);
-    const channel = await connection.createChannel();
+async function setupRabbitMQ() {
+  const connection = await amqp.connect(RABBITMQ_URL);
+  const channel = await connection.createChannel();
 
-    await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
-    console.log("Order manager is now consuming orders from RabbitMQ...");
+  // Declare the order manager queue
+  await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
-    // Start consuming messages
-    channel.consume(ORDER_MANAGER_QUEUE, async (msg) => {
-      if (msg !== null) {
+  // Declare the orderbook exchange
+  await channel.assertExchange(ORDERBOOK_EXCHANGE, "topic", { durable: true });
+
+  console.log("RabbitMQ setup completed.");
+  return { connection, channel };
+}
+
+// Publish a message to RabbitMQ with a consistent sequence number
+function publishMessage(channel, messageType, routingKey, message) {
+  const timestamp = Date.now(); // Optional: Add a timestamp to ensure the order is traceable
+
+  const fullMessage = {
+    ...message,
+    type: messageType,
+    sequenceNumber: seqGen.getNext(),
+    timestamp,
+  };
+
+  channel.publish(
+    ORDERBOOK_EXCHANGE,
+    routingKey,
+    Buffer.from(JSON.stringify(fullMessage))
+  );
+
+  console.log(`Published ${messageType} message: ${JSON.stringify(fullMessage)} to ${routingKey}`);
+}
+
+// Execution handler for the matching engine
+async function executionHandler(channel, ask_executions, bid_executions) {
+  console.log("ask executions: ", ask_executions);
+  console.log("bid executions: ", bid_executions);
+
+  // Append ask and bid executions into a single list
+  const all_executions = [...ask_executions, ...bid_executions];
+
+  // Publish each execution to the RabbitMQ topic exchange
+  for (const execution of all_executions) {
+    const routingKey = `${execution.symbol}.execution`; // e.g., "AAPL.execution"
+    publishMessage(channel, "execution", routingKey, execution);
+  }
+}
+
+async function consumeAndForwardOrders(channel) {
+  console.log("Order manager is now consuming orders from RabbitMQ...");
+
+  // Start consuming messages
+  channel.consume(ORDER_MANAGER_QUEUE, async (msg) => {
+    if (msg !== null) {
+      try {
         const rawOrder = JSON.parse(msg.content.toString());
 
         const processedOrder = processOrder(rawOrder);
 
-        console.log(`Order received: ${processedOrder.order_type} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`);
+        console.log(
+          `Order received: ${processedOrder.order_type} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`
+        );
 
-        await producer.send({
-          topic: "orders",
-          // partition by symbol to ensure orders of the same symbol are processed in order
-          messages: [
-            {
-              key: processedOrder.symbol,
-              value: JSON.stringify(processedOrder),
-            },
-          ],
-        });
+        // Publish the order to RabbitMQ
+        const routingKey = `${processedOrder.symbol}.order`; // e.g., "AAPL.order"
+        publishMessage(channel, "order", routingKey, processedOrder);
 
         // Create an EngineOrder instance from the parsed data
         const order = new EngineOrder(
@@ -92,15 +96,18 @@ async function consumeAndForwardOrders() {
           processedOrder.secnum
         );
 
-        matchingEngine.execute(order, executionHandler);
+        matchingEngine.execute(order, (askExec, bidExec) =>
+          executionHandler(channel, askExec, bidExec)
+        );
 
         // Acknowledge the message upon successful processing
         channel.ack(msg);
+      } catch (error) {
+        console.error("Error processing order:", error);
+        channel.nack(msg); // Negative acknowledgment on error
       }
-    });
-  } catch (error) {
-    console.error("Failed to consume and forward orders:", error);
-  }
+    }
+  });
 }
 
 function processOrder(order) {
@@ -113,5 +120,12 @@ function processOrder(order) {
   return order;
 }
 
-// Connect to Kafka and start consuming orders
-connectKafkaProducer().then(consumeAndForwardOrders);
+// Initialize RabbitMQ and start consuming
+(async () => {
+  try {
+    const { channel } = await setupRabbitMQ();
+    await consumeAndForwardOrders(channel);
+  } catch (error) {
+    console.error("Failed to start order manager:", error);
+  }
+})();
