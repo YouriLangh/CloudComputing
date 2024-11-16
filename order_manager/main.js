@@ -4,7 +4,7 @@ const { MatchingEngine, EngineOrder } = require("/app/matching-engine");
 let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
 const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
-const ORDERBOOK_EXCHANGE = "orderbook_exchange"; // Exchange for all messages (orders + executions)
+const ORDERBOOK_QUEUE = "orderbook_queue"; // Unified queue for orders and executions
 const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
 
 class SequentialNumberGenerator {
@@ -23,18 +23,16 @@ async function setupRabbitMQ() {
   const connection = await amqp.connect(RABBITMQ_URL);
   const channel = await connection.createChannel();
 
-  // Declare the order manager queue
+  // Declare the queues
   await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
-
-  // Declare the orderbook exchange
-  await channel.assertExchange(ORDERBOOK_EXCHANGE, "topic", { durable: true });
+  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
 
   console.log("RabbitMQ setup completed.");
   return { connection, channel };
 }
 
 // Publish a message to RabbitMQ with a consistent sequence number
-function publishMessage(channel, messageType, routingKey, message) {
+function publishMessage(channel, messageType, queue, message) {
   const timestamp = Date.now(); // Optional: Add a timestamp to ensure the order is traceable
 
   const fullMessage = {
@@ -44,13 +42,9 @@ function publishMessage(channel, messageType, routingKey, message) {
     timestamp,
   };
 
-  channel.publish(
-    ORDERBOOK_EXCHANGE,
-    routingKey,
-    Buffer.from(JSON.stringify(fullMessage))
-  );
+  channel.sendToQueue(queue, Buffer.from(JSON.stringify(fullMessage)));
 
-  console.log(`Published ${messageType} message: ${JSON.stringify(fullMessage)} to ${routingKey}`);
+  console.log(`Published ${messageType} message: ${JSON.stringify(fullMessage)} to ${queue}`);
 }
 
 // Execution handler for the matching engine
@@ -61,10 +55,9 @@ async function executionHandler(channel, ask_executions, bid_executions) {
   // Append ask and bid executions into a single list
   const all_executions = [...ask_executions, ...bid_executions];
 
-  // Publish each execution to the RabbitMQ topic exchange
+  // Publish each execution to RabbitMQ
   for (const execution of all_executions) {
-    const routingKey = `${execution.symbol}.execution`; // e.g., "AAPL.execution"
-    publishMessage(channel, "execution", routingKey, execution);
+    publishMessage(channel, "execution", ORDERBOOK_QUEUE, execution);
   }
 }
 
@@ -76,7 +69,6 @@ async function consumeAndForwardOrders(channel) {
     if (msg !== null) {
       try {
         const rawOrder = JSON.parse(msg.content.toString());
-
         const processedOrder = processOrder(rawOrder);
 
         console.log(
@@ -84,8 +76,7 @@ async function consumeAndForwardOrders(channel) {
         );
 
         // Publish the order to RabbitMQ
-        const routingKey = `${processedOrder.symbol}.order`; // e.g., "AAPL.order"
-        publishMessage(channel, "order", routingKey, processedOrder);
+        publishMessage(channel, "order", ORDERBOOK_QUEUE, processedOrder);
 
         // Create an EngineOrder instance from the parsed data
         const order = new EngineOrder(

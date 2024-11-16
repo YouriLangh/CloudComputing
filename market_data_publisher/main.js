@@ -3,7 +3,7 @@ const WebSocket = require("ws");
 const { OrderBook, Order } = require("/app/orderbook");
 
 const RABBITMQ_URL = "amqp://rabbitmq";
-const ORDERBOOK_QUEUE = "orderbook_exchange"; // RabbitMQ queue to consume messages
+const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
 
 let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
@@ -33,12 +33,6 @@ wss.on("connection", (ws) => {
       averages: Object.fromEntries(dailyAveragePrices),
     })
   );
-  ws.send(
-    JSON.stringify({
-      type: "historicalAverages",
-      data: Object.fromEntries(dailyAveragePrices),
-    })
-  );
 
   ws.on("close", () => {
     console.log("Client disconnected");
@@ -58,7 +52,7 @@ async function startMarketDataPublisher() {
     if (msg !== null) {
       const data = JSON.parse(msg.content.toString());
       const { type, ...content } = data;
-      console.log(data);
+
       if (type === "order") {
         processOrder(content);
       } else if (type === "execution") {
@@ -92,61 +86,5 @@ function publishToDashboard(data, type) {
   });
 }
 
-function calculateDailyAveragePrice() {
-  const averages = {};
-
-  for (const symbol of orderBook.symbol_order_book_map.keys()) {
-    const asks = orderBook.symbol_order_book_map.get(symbol).asks.toArray();
-    const bids = orderBook.symbol_order_book_map.get(symbol).bids.toArray();
-
-    const avgAskPrice = asks.length
-      ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
-      : 0;
-
-    const avgBidPrice = bids.length
-      ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
-      : 0;
-
-    averages[symbol] = { avgAskPrice, avgBidPrice };
-
-    // Append to the map for historical data
-    if (!dailyAveragePrices.has(symbol)) {
-      dailyAveragePrices.set(symbol, []);
-    }
-    dailyAveragePrices.get(symbol).push({
-      timestamp: Date.now(),
-      avgAskPrice,
-      avgBidPrice,
-    });
-  }
-
-  return averages;
-}
-
-function publishPriceEvolution() {
-  const averages = calculateDailyAveragePrice();
-
-  const message = JSON.stringify({
-    type: "priceEvolution",
-    data: averages,
-    timestamp: Date.now(),
-  });
-
-  clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(
-        message
-        // JSON.stringify({
-        //   type: "historicalAverages",
-        //   data: Object.fromEntries(dailyAveragePrices),
-        // })
-      );
-    }
-  });
-}
-
-setInterval(() => {
-  publishPriceEvolution();
-}, 60000); // Compute and send data every minute
-
+// Start the Market Data Publisher
 startMarketDataPublisher();
