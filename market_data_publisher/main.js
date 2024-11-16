@@ -31,8 +31,14 @@ wss.on("connection", (ws) => {
       type: "initialData",
       orderBook: orderBook.toJSON(),
       averages: Object.fromEntries(dailyAveragePrices),
-    }))
-  ws.send(JSON.stringify({ type: "historicalAverages", data: Object.fromEntries(dailyAveragePrices) }))
+    })
+  );
+  ws.send(
+    JSON.stringify({
+      type: "historicalAverages",
+      data: Object.fromEntries(dailyAveragePrices),
+    })
+  );
 
   ws.on("close", () => {
     console.log("Client disconnected");
@@ -52,7 +58,7 @@ async function startMarketDataPublisher() {
     if (msg !== null) {
       const data = JSON.parse(msg.content.toString());
       const { type, ...content } = data;
-
+      console.log(data);
       if (type === "order") {
         processOrder(content);
       } else if (type === "execution") {
@@ -128,7 +134,8 @@ function publishPriceEvolution() {
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(message
+      client.send(
+        message
         // JSON.stringify({
         //   type: "historicalAverages",
         //   data: Object.fromEntries(dailyAveragePrices),
