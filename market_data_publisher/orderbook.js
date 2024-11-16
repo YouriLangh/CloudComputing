@@ -37,12 +37,16 @@ class OrderBook {
   }
 
   adjustOrRemoveOrder(symbol, side, secnum, quantityToRemove) {
-    const orderBookSide = this.symbol_order_book.symbol_order_book_map.get(symbol);
+    const orderBookSide =
+      this.symbol_order_book.symbol_order_book_map.get(symbol);
     if (!orderBookSide) return;
-
+    console.log(
+      "Order book before adjustment: ",
+      JSON.stringify(this.symbol_order_book.toJSON())
+    );
     const heap = side === "ask" ? orderBookSide.asks : orderBookSide.bids;
     let orderIndex = this.findOrderIndex(heap, secnum);
-
+    cons;
     if (orderIndex === -1) {
       console.log(`Order with secnum ${secnum} not found.`);
       return;
@@ -60,7 +64,10 @@ class OrderBook {
       heap._heapifyDown(orderIndex);
     }
 
-    console.log("Order book after adjustment: ", JSON.stringify(this.symbol_order_book.toJSON()));
+    console.log(
+      "Order book after adjustment: ",
+      JSON.stringify(this.symbol_order_book.toJSON())
+    );
   }
 
   // Helper function to find the index of an order by secnum in the heap
@@ -72,7 +79,6 @@ class OrderBook {
     }
     return -1;
   }
-
 
   toJSON() {
     const orderBookJSON = {};
