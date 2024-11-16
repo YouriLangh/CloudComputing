@@ -52,7 +52,7 @@ async function startMarketDataPublisher() {
     if (msg !== null) {
       const data = JSON.parse(msg.content.toString());
       const { type, ...content } = data;
-
+      console.log(`Received message w data: ${JSON.stringify(content)}`);
       if (type === "order") {
         processOrder(content);
       } else if (type === "execution") {
@@ -73,7 +73,7 @@ function processOrder(data) {
 
 function processExecution(data) {
   const { symbol, order_type, secnum, quantity } = data;
-  orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
+  // orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
   publishToDashboard(orderBook.toJSON(), "orderBook");
 }
 
