@@ -38,7 +38,6 @@ function publishMessage(channel, messageType, queue, message) {
   const fullMessage = {
     ...message,
     type: messageType,
-    sequenceNumber: seqGen.getNext(),
     timestamp,
   };
 

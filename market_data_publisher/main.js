@@ -52,7 +52,7 @@ async function startMarketDataPublisher() {
     if (msg !== null) {
       const data = JSON.parse(msg.content.toString());
       const { type, ...content } = data;
-      console.log(`Received message w data: ${JSON.stringify(content)}`);
+      console.log(`Received ${type} message w data: ${JSON.stringify(content)}`);
       if (type === "order") {
         processOrder(content);
       } else if (type === "execution") {
