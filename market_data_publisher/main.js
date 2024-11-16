@@ -7,11 +7,16 @@ const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue to consume messages
 
 let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
+// Initialize dailyAveragePrices with empty arrays for each symbol
+let dailyAveragePrices = new Map();
+["AAPL", "GOOGL", "MSFT", "AMZN"].forEach((symbol) =>
+  dailyAveragePrices.set(symbol, [])
+);
+
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
-
-// Store active WebSocket connections
 const clients = new Set();
+
 wss.on("listening", () => {
   console.log("WebSocket server listening on ws://localhost:8080");
 });
@@ -20,12 +25,14 @@ wss.on("connection", (ws) => {
   console.log("Client connected");
   clients.add(ws);
 
+  // Send current order book and historical averages to new clients
   ws.send(
     JSON.stringify({
-      type: "orderBook",
-      data: orderBook.toJSON(),
-    })
-  );
+      type: "initialData",
+      orderBook: orderBook.toJSON(),
+      averages: Object.fromEntries(dailyAveragePrices),
+    }))
+  ws.send(JSON.stringify({ type: "historicalAverages", data: Object.fromEntries(dailyAveragePrices) }))
 
   ws.on("close", () => {
     console.log("Client disconnected");
@@ -37,7 +44,6 @@ async function startMarketDataPublisher() {
   const connection = await amqp.connect(RABBITMQ_URL);
   const channel = await connection.createChannel();
 
-  // Assert the queue
   await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
 
   console.log("Market Data Publisher consuming from RabbitMQ...");
@@ -48,14 +54,8 @@ async function startMarketDataPublisher() {
       const { type, ...content } = data;
 
       if (type === "order") {
-        console.log(
-          `Order: ${content.order_type} ${content.quantity} ${content.symbol} @ ${content.price} (${content.sequenceNumber})`
-        );
         processOrder(content);
       } else if (type === "execution") {
-        console.log(
-          `Execution: ${content.symbol} ${content.quantity} @ ${content.price} (${content.sequenceNumber})`
-        );
         processExecution(content);
       }
 
@@ -102,6 +102,16 @@ function calculateDailyAveragePrice() {
       : 0;
 
     averages[symbol] = { avgAskPrice, avgBidPrice };
+
+    // Append to the map for historical data
+    if (!dailyAveragePrices.has(symbol)) {
+      dailyAveragePrices.set(symbol, []);
+    }
+    dailyAveragePrices.get(symbol).push({
+      timestamp: Date.now(),
+      avgAskPrice,
+      avgBidPrice,
+    });
   }
 
   return averages;
@@ -109,6 +119,7 @@ function calculateDailyAveragePrice() {
 
 function publishPriceEvolution() {
   const averages = calculateDailyAveragePrice();
+
   const message = JSON.stringify({
     type: "priceEvolution",
     data: averages,
@@ -117,13 +128,18 @@ function publishPriceEvolution() {
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
+      client.send(message
+        // JSON.stringify({
+        //   type: "historicalAverages",
+        //   data: Object.fromEntries(dailyAveragePrices),
+        // })
+      );
     }
   });
 }
 
 setInterval(() => {
   publishPriceEvolution();
-}, 60000); // Send evolution every minute
+}, 60000); // Compute and send data every minute
 
 startMarketDataPublisher();

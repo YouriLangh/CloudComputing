@@ -16,6 +16,8 @@ const useWebSocket = (url, setOrderBookData, setPriceEvolutionData) => {
       if (message.type === "orderBook") {
         setOrderBookData(message.data); // Update the order book data directly
       } else if (message.type === "priceEvolution")
+      console.log("Received price evolution data from WebSocket server:", message.data);
+        else if (message.type === "historicalAverages")
         setPriceEvolutionData(message.data); // Update the price evolution data directly
     };
 
