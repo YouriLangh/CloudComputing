@@ -38,7 +38,6 @@ function publishMessage(channel, messageType, queue, message) {
   const fullMessage = {
     ...message,
     type: messageType,
-    timestamp,
   };
 
   channel.sendToQueue(queue, Buffer.from(JSON.stringify(fullMessage)));
@@ -105,7 +104,6 @@ function processOrder(order) {
   order.price = parseFloat(order.price);
   order.quantity = parseInt(order.quantity);
   delete order.user_id;
-  delete order.timestamp_ns;
   delete order.trader_type;
   return order;
 }

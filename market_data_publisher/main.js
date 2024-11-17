@@ -65,10 +65,36 @@ async function startMarketDataPublisher() {
 }
 
 function processOrder(data) {
-  const { price, symbol, quantity, order_type, secnum } = data;
+  const { price, symbol, quantity, order_type, secnum, timestamp_ns } = data;
   const order = new Order(order_type, price, quantity, secnum);
   orderBook.addOrder(symbol, order);
-  publishToDashboard(data, "order");
+
+  // Calculate the minute bucket for the timestamp
+  const minute = Math.floor(timestamp_ns / 60000000000);
+
+  // Check if this minute has already been recorded
+  const averages = dailyAveragePrices.get(symbol) || [];
+  const lastRecordedMinute = averages.length > 0 ? averages[averages.length - 1].minute : null;
+
+  if (minute !== lastRecordedMinute) {
+    // Compute average bid and ask prices
+    const bids = orderBook.getBids(symbol);
+    const asks = orderBook.getAsks(symbol);
+
+    const avgBidPrice = bids.length > 0 ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length : 0;
+    const avgAskPrice = asks.length > 0 ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length : 0;
+
+    // Add the average for this minute
+    averages.push({ timestamp_ns, avgBidPrice, avgAskPrice });
+    dailyAveragePrices.set(symbol, averages);
+
+    // Log and optionally publish the new averages to the dashboard
+    console.log(`Updated averages for ${symbol} at minute ${minute}:`, { avgBidPrice, avgAskPrice });
+    publishToDashboard({ symbol, averages }, "priceAverages");
+  }
+
+  // Publish the new order to the dashboard
+  publishToDashboard(orderBook.toJSON(), "orderBook");
 }
 
 function processExecution(data) {
