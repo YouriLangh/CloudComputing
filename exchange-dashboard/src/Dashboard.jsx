@@ -9,7 +9,7 @@ const Dashboard = () => {
 
   // State to store the order book data
   const [orderBookData, setOrderBookData] = useState({});
-  const [priceEvolutionData, setPriceEvolutionData] = useState(Map());
+  const [priceEvolutionData, setPriceEvolutionData] = useState(new Map());
 
   // Use the WebSocket hook and pass setOrderBookData to it
   useWebSocket(wsUrl, setOrderBookData, setPriceEvolutionData);
