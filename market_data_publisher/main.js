@@ -80,8 +80,8 @@ function processOrder(data) {
   // Check if a minute has passed since the last recorded average
   if (!lastRecordedTimestamp || timestamp_ns - lastRecordedTimestamp >= 60000000000) {
     // Compute average bid and ask prices
-    const bids = orderBook.getBids(symbol);
-    const asks = orderBook.getAsks(symbol);
+    const bids = orderBook.symbol_order_book_map.get(symbol).bids;
+    const asks = orderBook.symbol_order_book_map.get(symbol).asks;
 
     const avgBidPrice =
       bids.length > 0
