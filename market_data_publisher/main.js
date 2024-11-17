@@ -72,24 +72,35 @@ function processOrder(data) {
   // Calculate the minute bucket for the timestamp
   const minute = Math.floor(timestamp_ns / 60000000000);
 
-  // Check if this minute has already been recorded
+  // Retrieve the recorded averages for the symbol
   const averages = dailyAveragePrices.get(symbol) || [];
-  const lastRecordedMinute = averages.length > 0 ? averages[averages.length - 1].minute : null;
+  const lastRecordedTimestamp =
+    averages.length > 0 ? averages[averages.length - 1].timestamp_ns : null;
 
-  if (minute !== lastRecordedMinute) {
+  // Check if a minute has passed since the last recorded average
+  if (!lastRecordedTimestamp || timestamp_ns - lastRecordedTimestamp >= 60000000000) {
     // Compute average bid and ask prices
     const bids = orderBook.getBids(symbol);
     const asks = orderBook.getAsks(symbol);
 
-    const avgBidPrice = bids.length > 0 ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length : 0;
-    const avgAskPrice = asks.length > 0 ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length : 0;
+    const avgBidPrice =
+      bids.length > 0
+        ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
+        : 0;
+    const avgAskPrice =
+      asks.length > 0
+        ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
+        : 0;
 
-    // Add the average for this minute
+    // Record the average for this minute
     averages.push({ timestamp_ns, avgBidPrice, avgAskPrice });
     dailyAveragePrices.set(symbol, averages);
 
-    // Log and optionally publish the new averages to the dashboard
-    console.log(`Updated averages for ${symbol} at minute ${minute}:`, { avgBidPrice, avgAskPrice });
+    // Log and publish the updated averages to the dashboard
+    console.log(`Updated averages for ${symbol} at minute ${minute}:`, {
+      avgBidPrice,
+      avgAskPrice,
+    });
     publishToDashboard({ symbol, averages }, "priceAverages");
   }
 
