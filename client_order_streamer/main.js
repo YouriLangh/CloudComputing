@@ -32,8 +32,6 @@ async function streamOrders(cvs_filepath) {
         }
       );
       sendPromises.push(sendPromise);
-
-      console.log("Order sent to queue:"); // Log each order
     } catch (error) {
       console.error("Error processing line:", line, error);
     }
@@ -63,5 +61,5 @@ function parseLine(line) {
   };
 }
 
-const cvs_filepath = "/app/data/market_simulation_orders-1h.csv";
+const cvs_filepath = "/app/data/market_simulation_orders-1m.csv";
 streamOrders(cvs_filepath);

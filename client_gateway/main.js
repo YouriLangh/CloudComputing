@@ -56,11 +56,6 @@ async function consumeAndForwardOrders() {
 
         // Validate the order
         if (validateOrder(order)) {
-          console.log(
-            "Order validated, forwarding to Order Manager... %s",
-            price
-          );
-
           // Forward to the Order Manager queue
           channel.sendToQueue(
             ORDER_MANAGER_QUEUE,

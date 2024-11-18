@@ -1,17 +1,16 @@
 const amqp = require("amqplib");
 const WebSocket = require("ws");
-const { OrderBook, Order } = require("/app/orderbook");
 
 const RABBITMQ_URL = "amqp://rabbitmq";
 const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
 
-let orderBook = new OrderBook(["AAPL", "GOOGL", "MSFT", "AMZN"]);
-
-// Initialize dailyAveragePrices with empty arrays for each symbol
-let dailyAveragePrices = new Map();
-["AAPL", "GOOGL", "MSFT", "AMZN"].forEach((symbol) =>
-  dailyAveragePrices.set(symbol, [])
-);
+// Initialize order books with empty maps for each symbol
+let orderBooks = {
+  "AAPL": { bids: new Map(), asks: new Map() },
+  "GOOGL": { bids: new Map(), asks: new Map() },
+  "MSFT": { bids: new Map(), asks: new Map() },
+  "AMZN": { bids: new Map(), asks: new Map() },
+};
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
@@ -29,8 +28,7 @@ wss.on("connection", (ws) => {
   ws.send(
     JSON.stringify({
       type: "initialData",
-      orderBook: orderBook.toJSON(),
-      averages: Object.fromEntries(dailyAveragePrices),
+      orderBook: orderBooks,
     })
   );
 
@@ -65,57 +63,46 @@ async function startMarketDataPublisher() {
 }
 
 function processOrder(data) {
-  const { price, symbol, quantity, order_type, secnum, timestamp_ns } = data;
-  const order = new Order(order_type, price, quantity, secnum);
-  orderBook.addOrder(symbol, order);
+  const { price, symbol, quantity, order_type, secnum } = data;
 
-  // Calculate the minute bucket for the timestamp
-  const minute = Math.floor(timestamp_ns / 60000000000);
-
-  // Retrieve the recorded averages for the symbol
-  const averages = dailyAveragePrices.get(symbol) || [];
-  const lastRecordedTimestamp =
-    averages.length > 0 ? averages[averages.length - 1].timestamp_ns : null;
-
-  // Check if a minute has passed since the last recorded average
-  if (!lastRecordedTimestamp || timestamp_ns - lastRecordedTimestamp >= 60000000000) {
-    // Compute average bid and ask prices
-    const bids = orderBook.symbol_order_book_map.get(symbol).bids;
-    const asks = orderBook.symbol_order_book_map.get(symbol).asks;
-
-    const avgBidPrice =
-      bids.length > 0
-        ? bids.reduce((sum, order) => sum + order.price, 0) / bids.length
-        : 0;
-    const avgAskPrice =
-      asks.length > 0
-        ? asks.reduce((sum, order) => sum + order.price, 0) / asks.length
-        : 0;
-
-    // Record the average for this minute
-    averages.push({ timestamp_ns, avgBidPrice, avgAskPrice });
-    dailyAveragePrices.set(symbol, averages);
-
-    // Log and publish the updated averages to the dashboard
-    console.log(`Updated averages for ${symbol} at minute ${minute}:`, {
-      avgBidPrice,
-      avgAskPrice,
-    });
-    publishToDashboard({ symbol, averages }, "priceAverages");
+  // Add the order to the appropriate side (bids or asks)
+  if (order_type === "bid") {
+    const bids = orderBooks[symbol].bids;
+    bids.set(price, (bids.get(price) || 0) + quantity);
+  } else if (order_type === "ask") {
+    const asks = orderBooks[symbol].asks;
+    asks.set(price, (asks.get(price) || 0) + quantity);
   }
-
-  // Publish the new order to the dashboard
-  publishToDashboard(orderBook.toJSON(), "orderBook");
+  console.log(`Received ${order_type} order for ${quantity} ${symbol} at $${price}`);
+  console.log(`Updated order book: ${JSON.stringify(orderBooks[symbol])}`);
+  // Publish the updated order book to clients
+  publishToDashboard(data, "order");
 }
 
 function processExecution(data) {
-  const { symbol, order_type, secnum, quantity } = data;
-  // orderBook.adjustOrRemoveOrder(symbol, order_type, secnum, quantity);
-  publishToDashboard(orderBook.toJSON(), "orderBook");
+  const { price, symbol, quantity, side, secnum } = data;
+  const book = side ==="bid" ? orderBooks[symbol].bids : orderBooks[symbol].asks;
+  console.log("Book: ", book);
+  // Remove the quantity from the appropriate side (bids or asks)
+    if (book.has(price)) {
+      let remainingQuantity = book.get(price) - quantity;
+      if (remainingQuantity === 0) {
+        book.delete(price); // Remove the ask if quantity goes to zero 
+      } else {
+        book.set(price, remainingQuantity); // Update the ask with remaining quantity
+      }
+    }
+    console.log(`Executed ${quantity} ${side} order for ${symbol} at $${price}`);
+    console.log(`Updated order book: ${JSON.stringify(orderBooks[symbol])}`);
+  // Publish the updated order book to clients
+  publishToDashboard(data, "execution");
 }
 
 function publishToDashboard(data, type) {
-  const message = JSON.stringify({ type, data });
+  // Prepare the message with updated order book and new data
+  const message = JSON.stringify({ type, data, orderBooks });
+
+  // Send the message to all connected clients
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);

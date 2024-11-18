@@ -41,8 +41,6 @@ function publishMessage(channel, messageType, queue, message) {
   };
 
   channel.sendToQueue(queue, Buffer.from(JSON.stringify(fullMessage)));
-
-  console.log(`Published ${messageType} message: ${JSON.stringify(fullMessage)} to ${queue}`);
 }
 
 // Execution handler for the matching engine

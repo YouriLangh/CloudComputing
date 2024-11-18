@@ -7,8 +7,8 @@ services:
     environment:
       - RABBITMQ_LOGS=error # Setting logs to 'error' for less verbosity
     ports:
-      - "15672:15672" # RabbitMQ Management UI
-      - "5672:5672" # AMQP port for RabbitMQ consumers/producers
+      - "15673:15672" # RabbitMQ Management UI
+      - "5673:5672" # AMQP port for RabbitMQ consumers/producers
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_running"]
       interval: 5s
@@ -21,7 +21,7 @@ services:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_URL=amqp://rabbitmq:5673
     restart: on-failure
     volumes:
       - ./client_order_streamer/data:/app/data
@@ -32,7 +32,7 @@ services:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_URL=amqp://rabbitmq:5673
     restart: on-failure
 
   order_manager:
@@ -41,7 +41,7 @@ services:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_URL=amqp://rabbitmq:5673
     restart: on-failure
     volumes:
       - ./matching-engine:/app/matching-engine # Mount matching-engine folder
@@ -52,7 +52,9 @@ services:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
-      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - RABBITMQ_URL=amqp://rabbitmq:5673
     restart: on-failure
+    volumes:
+      - ./matching-engine:/app/matching-engine # Mount matching-engine folder
     ports:
       - "8080:8080" # Expose the WebSocket server
