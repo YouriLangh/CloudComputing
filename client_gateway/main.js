@@ -1,11 +1,10 @@
 const amqp = require("amqplib");
 
-// RabbitMQ configuration
+// Environment variables for RabbitMQ connection
 const ORDER_QUEUE = "orders"; // Queue where the Order Streamer publishes orders
 const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders to the Order Manager
 
-// Connection settings for RabbitMQ
-const RABBITMQ_URL = "amqp://rabbitmq"; // Update if RabbitMQ is hosted elsewhere
+const RABBITMQ_URL = "amqp://rabbitmq";
 
 // Function to validate orders
 function validateOrder(order) {

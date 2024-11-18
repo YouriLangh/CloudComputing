@@ -4,17 +4,18 @@ const WebSocket = require("ws");
 const RABBITMQ_URL = "amqp://rabbitmq";
 const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
 
-// Initialize order books with empty maps for each symbol
+// Initialize order books with empty objects for each symbol
 let orderBooks = {
-  "AAPL": { bids: new Map(), asks: new Map() },
-  "GOOGL": { bids: new Map(), asks: new Map() },
-  "MSFT": { bids: new Map(), asks: new Map() },
-  "AMZN": { bids: new Map(), asks: new Map() },
+  "AAPL": { bids: {}, asks: {} },
+  "GOOGL": { bids: {}, asks: {} },
+  "MSFT": { bids: {}, asks: {} },
+  "AMZN": { bids: {}, asks: {} },
 };
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
 const clients = new Set();
+const clientSubscriptions = new Map();
 
 wss.on("listening", () => {
   console.log("WebSocket server listening on ws://localhost:8080");
@@ -24,7 +25,10 @@ wss.on("connection", (ws) => {
   console.log("Client connected");
   clients.add(ws);
 
-  // Send current order book and historical averages to new clients
+  // Initialize the client's subscriptions
+  clientSubscriptions.set(ws, new Set());
+
+  // Send the current order book to new clients
   ws.send(
     JSON.stringify({
       type: "initialData",
@@ -32,8 +36,28 @@ wss.on("connection", (ws) => {
     })
   );
 
+  // Listen for subscription changes from the dashboard
+  ws.on("message", (message) => {
+    const msg = JSON.parse(message);
+    if (msg.type === "subscribe") {
+      const { symbol } = msg;
+      if (symbol && !clientSubscriptions.get(ws).has(symbol)) {
+        clientSubscriptions.get(ws).add(symbol);
+        console.log(`Client subscribed to ${symbol}`);
+      }
+    } else if (msg.type === "unsubscribe") {
+      const { symbol } = msg;
+      if (symbol && clientSubscriptions.get(ws).has(symbol)) {
+        clientSubscriptions.get(ws).delete(symbol);
+        console.log(`Client unsubscribed from ${symbol}`);
+      }
+    }
+  });
+
+  // Remove client subscriptions on disconnect
   ws.on("close", () => {
     console.log("Client disconnected");
+    clientSubscriptions.delete(ws);
     clients.delete(ws);
   });
 });
@@ -63,45 +87,43 @@ async function startMarketDataPublisher() {
 }
 
 function processOrder(data) {
-  const { price, symbol, quantity, order_type, secnum } = data;
-
+  const { price, symbol, quantity, side } = data;
   // Add the order to the appropriate side (bids or asks)
-  if (order_type === "bid") {
-    const bids = orderBooks[symbol].bids;
-    bids.set(price, (bids.get(price) || 0) + quantity);
-  } else if (order_type === "ask") {
-    const asks = orderBooks[symbol].asks;
-    asks.set(price, (asks.get(price) || 0) + quantity);
-  }
-  
-  // Publish the updated order book to clients
-  publishToDashboard(data, "order");
+  const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
+  bookSide[price] = (bookSide[price] || 0) + quantity;
+
+  console.log(`Added ${side} order for ${symbol} at price ${price} with quantity ${quantity}`);
+
+  // Publish the updated order book to all clients subscribed to the stock symbol
+  publishToDashboard(symbol, data, "order");
 }
 
 function processExecution(data) {
-  const { price, symbol, quantity, side, secnum } = data;
-  const book = side ==="bid" ? orderBooks[symbol].bids : orderBooks[symbol].asks;
+  const { price, symbol, quantity, side } = data;
+  const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
+  console.log(`Removing ${quantity} at price ${price} from ${JSON.stringify(bookSide)}`);
+  
   // Remove the quantity from the appropriate side (bids or asks)
-    if (book.has(price)) {
-      let remainingQuantity = book.get(price) - quantity;
-      if (remainingQuantity === 0) {
-        book.delete(price); // Remove the ask if quantity goes to zero 
-      } else {
-        book.set(price, remainingQuantity); // Update the ask with remaining quantity
-      }
+  if (bookSide[price] !== undefined) {
+    let remainingQuantity = bookSide[price] - quantity;
+    if (remainingQuantity <= 0) {
+      delete bookSide[price]; // Remove the entry if quantity goes to zero or below
+    } else {
+      bookSide[price] = remainingQuantity; // Update the entry with remaining quantity
     }
+  }
 
-  // Publish the updated order book to clients
-  publishToDashboard(data, "execution");
+  // Publish the updated order book to all clients subscribed to the stock symbol
+  publishToDashboard(symbol, data, "execution");
 }
 
-function publishToDashboard(data, type) {
+function publishToDashboard(symbol, data, type) {
   // Prepare the message with updated order book and new data
-  const message = JSON.stringify({ type, data, orderBooks });
+  const message = JSON.stringify({ type, data });
 
-  // Send the message to all connected clients
+  // Send the message to all clients that are subscribed to the symbol
   clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
+    if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client).has(symbol)) {
       client.send(message);
     }
   });

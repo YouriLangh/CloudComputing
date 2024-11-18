@@ -8,7 +8,13 @@ const Dashboard = () => {
   const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:8080";
 
   // State to store the order book data
-  const [orderBookData, setOrderBookData] = useState({});
+  const [orderBookData, setOrderBookData] = useState({
+    "AAPL": { bids: new Map(), asks: new Map() },
+    "GOOGL": { bids: new Map(), asks: new Map() },
+    "MSFT": { bids: new Map(), asks: new Map() },
+    "AMZN": { bids: new Map(), asks: new Map() },
+  });
+  
   const [priceEvolutionData, setPriceEvolutionData] = useState(new Map());
 
   // Use the WebSocket hook and pass setOrderBookData to it

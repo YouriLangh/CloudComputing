@@ -68,7 +68,7 @@ async function consumeAndForwardOrders(channel) {
         const processedOrder = processOrder(rawOrder);
 
         console.log(
-          `Order received: ${processedOrder.order_type} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`
+          `Order received: ${processedOrder.side} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`
         );
 
         // Publish the order to RabbitMQ
@@ -77,7 +77,7 @@ async function consumeAndForwardOrders(channel) {
         // Create an EngineOrder instance from the parsed data
         const order = new EngineOrder(
           processedOrder.symbol,
-          processedOrder.order_type,
+          processedOrder.side,
           processedOrder.price,
           processedOrder.quantity,
           processedOrder.secnum
@@ -103,6 +103,8 @@ function processOrder(order) {
   order.quantity = parseInt(order.quantity);
   delete order.user_id;
   delete order.trader_type;
+  order.side = order.order_type;
+  delete order.order_type;
   return order;
 }
 

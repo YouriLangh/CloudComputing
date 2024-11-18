@@ -12,11 +12,30 @@ const useWebSocket = (url, setOrderBookData, setPriceEvolutionData) => {
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
       console.log("Received message from WebSocket server:", message);
-
-      if (message.type === "orderBook") {
-        setOrderBookData(message.data); // Update the order book data directly
-      } else if (message.type === "priceEvolution")
+      if (message.type === "priceEvolution")
       console.log("Received price evolution data from WebSocket server:", message.data);
+    else if(message.type === "order") {
+        const { price, symbol, quantity, order_type, secnum } = message.data;
+        if (order_type === "bid") {
+          const bids = orderBookData[symbol].bids;
+          bids.set(price, (bids.get(price) || 0) + quantity);
+        } else if (order_type === "ask") {
+          const asks = orderBookData[symbol].asks;
+          asks.set(price, (asks.get(price) || 0) + quantity);
+        }
+        setOrderBookData({ ...orderBookData }); // Update the order book data
+      } else if (message.type === "execution") {
+        const { price, symbol, quantity, side, secnum } = message.data;
+        const book = side === "bid" ? orderBookData[symbol].bids : orderBookData[symbol].asks;
+        if (book.has(price)) {
+          let remainingQuantity = book.get(price) - quantity;
+          if (remainingQuantity === 0) {
+            book.delete(price); // Remove the ask if quantity goes to zero
+          } else {
+            book.set(price, remainingQuantity); // Update the ask with remaining quantity
+          }
+        }
+      }
         else if (message.type === "initialData")
         setOrderBookData(message.orderBook); // Update the order book data directly
         setPriceEvolutionData(message.averages); // Update the price evolution data directly
