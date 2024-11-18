@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import "./App.css";
 import OrderBookChart from "./OrderBookChart";
-
+// import PriceEvolutionChart from "./PriceEvolutionChart";
 const App = () => {
     const [ws, setWs] = useState(null);
   const [orderBooks, setOrderBooks] = useState({
@@ -92,6 +91,8 @@ const App = () => {
   </select>
 </div>
 <OrderBookChart orderBookData={orderBooks[selectedSymbol]} />
+{/* <PriceEvolutionChart /> */}
+
     </div>
   );
 };

@@ -105,6 +105,7 @@ function processOrder(order) {
   delete order.trader_type;
   order.side = order.order_type;
   delete order.order_type;
+  delete order.timestamp_ns;
   return order;
 }
 
