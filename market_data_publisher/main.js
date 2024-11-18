@@ -73,8 +73,7 @@ function processOrder(data) {
     const asks = orderBooks[symbol].asks;
     asks.set(price, (asks.get(price) || 0) + quantity);
   }
-  console.log(`Received ${order_type} order for ${quantity} ${symbol} at $${price}`);
-  console.log(`Updated order book: ${JSON.stringify(orderBooks[symbol])}`);
+  
   // Publish the updated order book to clients
   publishToDashboard(data, "order");
 }
@@ -82,7 +81,6 @@ function processOrder(data) {
 function processExecution(data) {
   const { price, symbol, quantity, side, secnum } = data;
   const book = side ==="bid" ? orderBooks[symbol].bids : orderBooks[symbol].asks;
-  console.log("Book: ", book);
   // Remove the quantity from the appropriate side (bids or asks)
     if (book.has(price)) {
       let remainingQuantity = book.get(price) - quantity;
@@ -92,8 +90,7 @@ function processExecution(data) {
         book.set(price, remainingQuantity); // Update the ask with remaining quantity
       }
     }
-    console.log(`Executed ${quantity} ${side} order for ${symbol} at $${price}`);
-    console.log(`Updated order book: ${JSON.stringify(orderBooks[symbol])}`);
+
   // Publish the updated order book to clients
   publishToDashboard(data, "execution");
 }
