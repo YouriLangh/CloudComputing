@@ -1,102 +1,97 @@
-import React, { useEffect, useState } from 'react';
-import './App.css';
+import React, { useEffect, useState } from "react";
+import "./App.css";
+import OrderBookChart from "./OrderBookChart";
 
 const App = () => {
-  const [ws, setWs] = useState(null); // WebSocket connection
+    const [ws, setWs] = useState(null);
   const [orderBooks, setOrderBooks] = useState({
-    AAPL: { bids: new Map(), asks: new Map() },
-    GOOGL: { bids: new Map(), asks: new Map() },
-    MSFT: { bids: new Map(), asks: new Map() },
-    AMZN: { bids: new Map(), asks: new Map() },
+    AAPL: { bids: {}, asks: {} },
+    GOOGL: { bids: {}, asks: {} },
+    MSFT: { bids: {}, asks: {} },
+    AMZN: { bids: {}, asks: {} },
   });
-  const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
+  const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
 
-  // Initialize WebSocket connection and subscribe to order book updates
   useEffect(() => {
-    const socket = new WebSocket('ws://localhost:8080');
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "subscribe", symbol: selectedSymbol }));
+    }
+  }, [selectedSymbol]);
+
+  useEffect(() => {
+    const socket = new WebSocket("ws://localhost:8080");
+
     socket.onopen = () => {
-      console.log('WebSocket connected');
+      console.log("WebSocket connected");
     };
 
     socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('Received data:', data);
-      if (data.type === 'initialData') {
-        // Handle initial data
-        setOrderBooks(data.orderBook);
-      } else if (data.type === 'order') {
-        // Handle live updates to the order book
-        updateOrderBook(data.data, data.type);
-      }
-    };
+        const message = JSON.parse(event.data);
+        console.log("Received data:", message);
+      
+        if (message.type === "initialData") {
+          setOrderBooks(message.orderBook);
+        } else if (message.type === "order" || message.type === "execution") {
+          updateOrderBook(message.data, message.type);
+        } else if (message.type === "orderBookUpdate") {
+          // Update the order book for the current symbol
+          const { orderBook } = message.data;
+          setOrderBooks((prevOrderBooks) => ({
+            ...prevOrderBooks,
+            [selectedSymbol]: orderBook,
+          }));
+        }
+      };
+    setWs(socket);
 
     socket.onclose = () => {
-      console.log('WebSocket disconnected');
+      console.log("WebSocket disconnected");
     };
-
-    setWs(socket);
 
     return () => {
       socket.close(); // Clean up WebSocket on component unmount
     };
   }, []);
 
-  // Update the order book based on received data (order or execution)
   const updateOrderBook = (data, type) => {
-    const { symbol, price, quantity, order_type } = data;
+    const { symbol, price, quantity, side } = data;
     const updatedOrderBooks = { ...orderBooks };
 
-    // Add or update the order in the order book
-    if (order_type === 'bid') {
-      const bids = updatedOrderBooks[symbol].bids;
-      bids.set(price, (bids.get(price) || 0) + quantity);
-    } else if (order_type === 'ask') {
-      const asks = updatedOrderBooks[symbol].asks;
-      asks.set(price, (asks.get(price) || 0) + quantity);
+    // Determine the correct side of the order book
+    const sideKey = side === "bid" ? "bids" : "asks";
+    const orders = updatedOrderBooks[symbol][sideKey];
+
+    if (type === "order") {
+      // Add or update the quantity at the specified price
+      orders[price] = (orders[price] || 0) + quantity;
+    } else if (type === "execution") {
+      // Subtract the executed quantity
+      if (orders[price] !== undefined) {
+        const remainingQuantity = orders[price] - quantity;
+        if (remainingQuantity <= 0) {
+          delete orders[price]; // Remove the price level if quantity is zero or less
+        } else {
+          orders[price] = remainingQuantity;
+        }
+      }
     }
 
-    // Publish the updated order book
     setOrderBooks(updatedOrderBooks);
   };
 
-  // Function to render the bids or asks table for a selected symbol
-  const renderOrderBookTable = (side) => {
-    const orders = orderBooks[selectedSymbol][side];
-    const sortedOrders = [...orders.entries()].sort((a, b) => (side === 'bids' ? b[0] - a[0] : a[0] - b[0]));
-    return (
-      <tbody>
-        {sortedOrders.map(([price, quantity]) => (
-          <tr key={price}>
-            <td>{price}</td>
-            <td>{quantity}</td>
-          </tr>
-        ))}
-      </tbody>
-    );
-  };
 
   return (
     <div className="container">
       <div className="controls">
-        <button onClick={() => setSelectedSymbol('AAPL')}>AAPL</button>
-        <button onClick={() => setSelectedSymbol('GOOGL')}>GOOGL</button>
-        <button onClick={() => setSelectedSymbol('MSFT')}>MSFT</button>
-        <button onClick={() => setSelectedSymbol('AMZN')}>AMZN</button>
-      </div>
-
-      <div className="orderbook">
-        <h2>{selectedSymbol} Order Book</h2>
-        <table className="orderbook-table">
-          <thead>
-            <tr>
-              <th>Price</th>
-              <th>Quantity</th>
-            </tr>
-          </thead>
-          {renderOrderBookTable('bids')}
-          {renderOrderBookTable('asks')}
-        </table>
-      </div>
+  <select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}>
+    {Object.keys(orderBooks).map((symbol) => (
+      <option key={symbol} value={symbol}>
+        {symbol}
+      </option>
+    ))}
+  </select>
+</div>
+<OrderBookChart orderBookData={orderBooks[selectedSymbol]} />
     </div>
   );
 };

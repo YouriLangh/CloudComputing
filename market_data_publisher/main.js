@@ -26,7 +26,7 @@ wss.on("connection", (ws) => {
   clients.add(ws);
 
   // Initialize the client's subscriptions
-  clientSubscriptions.set(ws, new Set());
+  clientSubscriptions.set(ws, "AAPL");
 
   // Send the current order book to new clients
   ws.send(
@@ -41,15 +41,11 @@ wss.on("connection", (ws) => {
     const msg = JSON.parse(message);
     if (msg.type === "subscribe") {
       const { symbol } = msg;
-      if (symbol && !clientSubscriptions.get(ws).has(symbol)) {
-        clientSubscriptions.get(ws).add(symbol);
+      if (symbol) {
+        clientSubscriptions.set(ws, symbol);
         console.log(`Client subscribed to ${symbol}`);
-      }
-    } else if (msg.type === "unsubscribe") {
-      const { symbol } = msg;
-      if (symbol && clientSubscriptions.get(ws).has(symbol)) {
-        clientSubscriptions.get(ws).delete(symbol);
-        console.log(`Client unsubscribed from ${symbol}`);
+        console.log(clientSubscriptions)
+        publishToDashboard(symbol, orderBooks[symbol], "orderBookUpdate");
       }
     }
   });
@@ -92,8 +88,6 @@ function processOrder(data) {
   const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
   bookSide[price] = (bookSide[price] || 0) + quantity;
 
-  console.log(`Added ${side} order for ${symbol} at price ${price} with quantity ${quantity}`);
-
   // Publish the updated order book to all clients subscribed to the stock symbol
   publishToDashboard(symbol, data, "order");
 }
@@ -101,8 +95,7 @@ function processOrder(data) {
 function processExecution(data) {
   const { price, symbol, quantity, side } = data;
   const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
-  console.log(`Removing ${quantity} at price ${price} from ${JSON.stringify(bookSide)}`);
-  
+
   // Remove the quantity from the appropriate side (bids or asks)
   if (bookSide[price] !== undefined) {
     let remainingQuantity = bookSide[price] - quantity;
@@ -123,7 +116,7 @@ function publishToDashboard(symbol, data, type) {
 
   // Send the message to all clients that are subscribed to the symbol
   clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client).has(symbol)) {
+    if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client) === symbol) {
       client.send(message);
     }
   });

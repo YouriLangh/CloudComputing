@@ -1,96 +1,44 @@
-import React, { useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+import React from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const OrderBookChart = ({ orderBookData }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
+  const { bids, asks } = orderBookData;
 
-  // Function to prepare the chart data for the selected symbol
-  const prepareChartData = (symbol) => {
-    const orderBook = orderBookData[symbol];
+  // Prepare chart data using the provided cumulative bids and asks
+  const bidPrices = Object.keys(bids).map(Number).sort((a, b) => b - a); // Sort bids descending
+  const askPrices = Object.keys(asks).map(Number).sort((a, b) => a - b); // Sort asks ascending
 
-    // Check if orderBook exists for the selected symbol
-    if (!orderBook) {
-      return []; // Return an empty array if no data is available
-    }
+  const data = [];
 
-    // Prepare combined data with both bids and asks
-    const combinedData = [
-      ...orderBook.bids.map((bid) => ({
-        price: bid.price,
-        quantity: bid.quantity,
-        side: "Bid",
-      })),
-      ...orderBook.asks.map((ask) => ({
-        price: ask.price,
-        quantity: ask.quantity,
-        side: "Ask",
-      })),
-    ];
-    return combinedData
-  };
+  // Create data array for bids
+  bidPrices.forEach((price) => {
+    data.push({ price, bids: bids[price], asks: 0 });
+  });
 
-  const chartData = prepareChartData(selectedSymbol);
+  // Create data array for asks
+  askPrices.forEach((price) => {
+    data.push({ price, bids: 0, asks: asks[price] });
+  });
 
-  // Function to determine the color based on the side (Bid or Ask)
-  const getBarColor = (side) => {
-    return side === "Bid" ? "rgba(75, 192, 192, 0.5)" : "rgba(255, 99, 132, 0.5)";
-  };
+  // Sort by price for correct alignment
+  const sortedData = data.sort((a, b) => a.price - b.price);
 
   return (
-    <div>
-      <h2>Order Book for {selectedSymbol}</h2>
-      <select
-        onChange={(e) => setSelectedSymbol(e.target.value)}
-        value={selectedSymbol}
-      >
-        {Object.keys(orderBookData).map((symbol) => (
-          <option key={symbol} value={symbol}>
-            {symbol}
-          </option>
-        ))}
-      </select>
-
-      <div style={{ width: "100%", height: "400px" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="price"
-              tickFormatter={(value) => value.toFixed(2)} // Format price with 2 decimal places
-            />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar
-              dataKey="quantity"
-              barSize={20}
-              radius={[5, 5, 0, 0]}
-              name="Orders"
-            >
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={getBarColor(entry.side)} // Apply color based on side (Bid or Ask)
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <ResponsiveContainer width={700} height={700}>
+    <BarChart
+      width={800}
+      height={400}
+      data={sortedData}
+      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="price" label={{ value: "Order Price", position: "insideBottom", offset: -5 }} />
+      <YAxis label={{ value: "Cumulative Amount", angle: -90, position: "insideLeft" }} />
+      <Tooltip />
+      <Bar dataKey="bids" fill="green" stackId="orders" />
+      <Bar dataKey="asks" fill="red" stackId="orders" />
+    </BarChart>
+    </ResponsiveContainer>
   );
 };
 
