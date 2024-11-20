@@ -3,49 +3,39 @@ const split2 = require("split2");
 const amqp = require("amqplib");
 const assert = require("assert");
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function streamOrders(cvs_filepath) {
   const connection = await amqp.connect("amqp://rabbitmq");
   const channel = await connection.createChannel();
   const queue = "orders";
 
-  // Ensure the queue exists
   await channel.assertQueue(queue, { durable: true });
 
   const orderStream = fs
     .createReadStream(cvs_filepath, { encoding: "utf-8" })
     .pipe(split2());
 
-  // This will hold all promises for sending to queue, to wait for completion
-  const sendPromises = [];
-
-  // Loop through each line of the CSV and send to the queue
   for await (const line of orderStream) {
     try {
       const order = parseLine(line);
-
-      // Push the send promise into the array to ensure we wait for it
-      const sendPromise = channel.sendToQueue(
-        queue,
-        Buffer.from(JSON.stringify(order)),
-        {
-          persistent: true,
-        }
-      );
-      sendPromises.push(sendPromise);
+      channel.sendToQueue(queue, Buffer.from(JSON.stringify(order)), {
+        persistent: true,
+      });
+      // Limit the rate
+      await sleep(100); // 50ms delay = 20 messages/sec
     } catch (error) {
       console.error("Error processing line:", line, error);
     }
   }
 
-  // Wait for all promises to resolve (ensure the last line is processed)
-  await Promise.all(sendPromises);
-
-  // Once all lines have been sent, close the connection
-  console.log("Finished streaming orders.\nClosing connection in 5 seconds...");
-  setTimeout(() => {
-    connection.close();
-  }, 5000);
+  console.log("Finished streaming orders. Closing connection in 5 seconds...");
+  setTimeout(() => connection.close(), 5000);
 }
+
+
 
 function parseLine(line) {
   const fields = line.split(",");
@@ -61,5 +51,5 @@ function parseLine(line) {
   };
 }
 
-const cvs_filepath = "/app/data/market_simulation_orders-1m.csv";
+const cvs_filepath = "/app/data/market_simulation_orders-1h.csv";
 streamOrders(cvs_filepath);

@@ -1,14 +1,18 @@
 const amqp = require("amqplib");
 const WebSocket = require("ws");
-const { Subject } = require('rxjs');
-const { groupBy, map, mergeMap, scan, debounceTime } = require("rxjs/operators");
+const { Observable } = require("rxjs");
+const { groupBy, map, mergeMap, scan, bufferTime } = require("rxjs/operators");
 
 const RABBITMQ_URL = "amqp://rabbitmq";
 const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
 
-// RxJS Observable to stream orders
-const orderStream = new Subject();
-
+// History data structure to store computed averages
+const averagePriceHistory = {
+  AAPL: [],
+  GOOGL: [],
+  MSFT: [],
+  AMZN: [],
+};
 // Initialize order books with empty objects for each symbol
 let orderBooks = {
   "AAPL": { bids: {}, asks: {} },
@@ -37,7 +41,8 @@ wss.on("connection", (ws) => {
   ws.send(
     JSON.stringify({
       type: "initialData",
-      orderBook: orderBooks,
+      averages: averagePriceHistory,
+      orderBook: orderBooks["AAPL"],
     })
   );
 
@@ -49,7 +54,6 @@ wss.on("connection", (ws) => {
       if (symbol) {
         clientSubscriptions.set(ws, symbol);
         console.log(`Client subscribed to ${symbol}`);
-        publishToDashboard(symbol, orderBooks[symbol], "orderBookUpdate");
       }
     }
   });
@@ -63,98 +67,12 @@ wss.on("connection", (ws) => {
 });
 
 
-async function startMarketDataPublisher() {
-  const connection = await amqp.connect(RABBITMQ_URL);
-  const channel = await connection.createChannel();
-
-  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
-
-  console.log("Market Data Publisher consuming from RabbitMQ...");
-
-  await channel.consume(ORDERBOOK_QUEUE, (msg) => {
-    if (msg !== null) {
-      const data = JSON.parse(msg.content.toString());
-      const { type, ...content } = data;
-      console.log(`Received ${type} message w data: ${JSON.stringify(content)}`);
-      if (type === "order") {
-        processOrder(content);
-      } else if (type === "execution") {
-        processExecution(content);
-      }
-
-      channel.ack(msg); // Acknowledge the message
-    }
-  });
-}
-// Function to handle order updates and compute averages
-const computeAvgPricesPerMinute = () => {
-  orderStream.pipe(
-    // Group by symbol (AMZN, GOOGL, etc.)
-    groupBy(order => order.symbol),
-
-    // For each symbol group, process the orders
-    mergeMap(group$ =>
-      group$.pipe(
-        // Group by current minute timestamp
-        groupBy(order => {
-          // Get the current time
-          const currentTime = new Date();
-          currentTime.setSeconds(0);  // Reset seconds to 0
-          currentTime.setMilliseconds(0); // Reset milliseconds to 0
-          return currentTime.toISOString(); // Group by truncated current time (minute)
-        }),
-
-        // For each minute group, accumulate prices and quantities
-        mergeMap(minuteGroup$ =>
-          minuteGroup$.pipe(
-            scan((acc, order) => {
-              // Accumulate ask and bid prices for the current minute
-              if (order.side === 'bid') {
-                acc.bids.totalPrice += order.price * order.quantity;
-                acc.bids.totalQuantity += order.quantity;
-              } else if (order.side === 'ask') {
-                acc.asks.totalPrice += order.price * order.quantity;
-                acc.asks.totalQuantity += order.quantity;
-              }
-              return acc;
-            }, {
-              bids: { totalPrice: 0, totalQuantity: 0 },
-              asks: { totalPrice: 0, totalQuantity: 0 }
-            }),
-
-            // After accumulating, calculate average price for both bids and asks
-            map(acc => ({
-              minuteTimestamp: minuteGroup$.key, // Use the truncated current time as the minute timestamp
-              symbol: group$.key, // Stock symbol
-              avgBidPrice: acc.bids.totalQuantity > 0 ? acc.bids.totalPrice / acc.bids.totalQuantity : 0,
-              avgAskPrice: acc.asks.totalQuantity > 0 ? acc.asks.totalPrice / acc.asks.totalQuantity : 0,
-            }))
-          )
-        )
-      )
-    ),
-
-    // Optional: Debounce time to simulate real-time processing every minute (for efficiency)
-    debounceTime(1000) // Adjust this as per your needs
-  ).subscribe(result => {
-    console.log('Average Prices per Minute:', result);
-    // Send the average price data to WebSocket clients subscribed to the symbol
-    publishToDashboard(result.symbol, result, "avgPriceUpdate");
-  });
-};
-
 // Function to process an order message
 function processOrder(data) {
-  const { timestamp_ns, price, symbol, quantity, side } = data;
+  const { price, symbol, quantity, side } = data;
   // Add the order to the appropriate side (bids or asks)
   const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
   bookSide[price] = (bookSide[price] || 0) + quantity;
-
-  // Emit the order to the stream
-  orderStream.next(data);
-  
-  // Publish the updated order book to all clients subscribed to the stock symbol
-  // publishToDashboard(symbol, data, "order");
 }
 
 // Function to handle order execution updates
@@ -171,17 +89,83 @@ function processExecution(data) {
       bookSide[price] = remainingQuantity; // Update the entry with remaining quantity
     }
   }
-
-  // Publish the updated order book to all clients subscribed to the stock symbol
-  // publishToDashboard(symbol, data, "execution");
 }
 
-// Publish updates to clients
+// Create an Observable for RabbitMQ orders
+const orderStream = new Observable(async (subscriber) => {
+  const connection = await amqp.connect(RABBITMQ_URL);
+  const channel = await connection.createChannel();
+
+  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
+
+  console.log("Consuming from RabbitMQ...");
+
+  channel.consume(ORDERBOOK_QUEUE, (msg) => {
+    if (msg !== null) {
+      const data = JSON.parse(msg.content.toString());
+      const { type, ...content } = data;
+      console.log(`Received ${type} message w data: ${JSON.stringify(content)}`);
+      if (type === "order") {
+        subscriber.next(data); // Emit the order to the stream
+        processOrder(content);
+      } else if (type === "execution") {
+        processExecution(content);
+      }
+
+      channel.ack(msg); // Acknowledge the message
+    }
+  });
+});
+
+// Process the order stream and compute averages
+orderStream.pipe(
+  // Group by stock symbol
+  groupBy(order => order.symbol),
+  mergeMap(group$ =>
+    group$.pipe(
+      // Group orders into 1-minute windows
+      bufferTime(60000), // Buffer for 1 minute
+
+      // For each 1-minute window, compute average prices
+      map(orders => {
+        const bids = { totalPrice: 0, totalQuantity: 0 };
+        const asks = { totalPrice: 0, totalQuantity: 0 };
+
+        // Accumulate prices and quantities
+        orders.forEach(order => {
+          if (order.side === 'bid') {
+            bids.totalPrice += order.price * order.quantity;
+            bids.totalQuantity += order.quantity;
+          } else if (order.side === 'ask') {
+            asks.totalPrice += order.price * order.quantity;
+            asks.totalQuantity += order.quantity;
+          }
+        });
+
+        return {
+          symbol: group$.key,
+          minuteTimestamp: new Date().toISOString(),
+          avgBidPrice: bids.totalQuantity > 0 ? bids.totalPrice / bids.totalQuantity : 0,
+          avgAskPrice: asks.totalQuantity > 0 ? asks.totalPrice / asks.totalQuantity : 0,
+        };
+      })
+    )
+  )
+).subscribe(average => {
+  console.log('Computed Average:', average);
+
+
+
+  // Store the computed average in the history data structure
+  const { symbol, minuteTimestamp, avgBidPrice, avgAskPrice } = average;
+  averagePriceHistory[symbol].push({ minuteTimestamp, avgBidPrice, avgAskPrice });
+
+});
+
+// Publish updates to WebSocket clients
 function publishToDashboard(symbol, data, type) {
-  // Prepare the message with updated order book and new data
   const message = JSON.stringify({ type, data });
 
-  // Send the message to all clients that are subscribed to the symbol
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client) === symbol) {
       client.send(message);
@@ -189,8 +173,18 @@ function publishToDashboard(symbol, data, type) {
   });
 }
 
-// Start the Market Data Publisher
-startMarketDataPublisher();
+// Start the application
+orderStream.subscribe(); // Start the order stream
 
-// Start the average price computation
-computeAvgPricesPerMinute();
+setInterval(() => {
+  clients.forEach((client) => {
+    const symbol = clientSubscriptions.get(client);
+    const averages = averagePriceHistory[symbol];
+    const orderBook = orderBooks[symbol];
+    data = {
+        averages: averages,
+        orderBook: orderBook
+    }
+    publishToDashboard(symbol, data, "update");
+  });
+}, 1000); // Publish every second
