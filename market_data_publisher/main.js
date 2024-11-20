@@ -36,15 +36,7 @@ wss.on("connection", (ws) => {
 
   // Initialize the client's subscriptions
   clientSubscriptions.set(ws, "AAPL");
-
-  // Send the current order book to new clients
-  ws.send(
-    JSON.stringify({
-      type: "initialData",
-      averages: averagePriceHistory,
-      orderBook: orderBooks["AAPL"],
-    })
-  );
+  updateDashboard("AAPL", { averages: averagePriceHistory["AAPL"], orderBook: orderBooks["AAPL"] });
 
   // Listen for subscription changes from the dashboard
   ws.on("message", (message) => {
@@ -163,8 +155,8 @@ orderStream.pipe(
 });
 
 // Publish updates to WebSocket clients
-function publishToDashboard(symbol, data, type) {
-  const message = JSON.stringify({ type, data });
+function updateDashboard(symbol, data) {
+  const message = JSON.stringify({ data });
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client) === symbol) {
@@ -185,6 +177,6 @@ setInterval(() => {
         averages: averages,
         orderBook: orderBook
     }
-    publishToDashboard(symbol, data, "update");
+    updateDashboard(symbol, data);
   });
 }, 1000); // Publish every second

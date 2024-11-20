@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import OrderBookChart from "./OrderBookChart";
-// import PriceEvolutionChart from "./PriceEvolutionChart";
+import PriceEvolutionChart from "./PriceEvolutionChart";
 const App = () => {
     const [ws, setWs] = useState(null);
   const [orderBooks, setOrderBooks] = useState({
@@ -10,7 +10,7 @@ const App = () => {
     AMZN: { bids: {}, asks: {} },
   });
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
-
+  const [averages, setAverages] = useState([]);
   useEffect(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "subscribe", symbol: selectedSymbol }));
@@ -27,14 +27,11 @@ const App = () => {
     socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         console.log("Received data:", message);
-      
-        if (message.type === "initialData") {
-          setOrderBooks(message.orderBook);
-        } else if (message.type === "order" || message.type === "execution") {
-          updateOrderBook(message.data, message.type);
-        } else if (message.type === "orderBookUpdate") {
-          // Update the order book for the current symbol
-          const { orderBook } = message.data;
+        if(message.data.averages !== undefined && message.data.orderBook !== undefined){
+          const { averages, orderBook } = message.data;
+          console.log("Received averages:", averages);
+          console.log("Received orderBook:", orderBook);
+          if(averages.length > 0) setAverages(averages);
           setOrderBooks((prevOrderBooks) => ({
             ...prevOrderBooks,
             [selectedSymbol]: orderBook,
@@ -52,33 +49,6 @@ const App = () => {
     };
   }, []);
 
-  const updateOrderBook = (data, type) => {
-    const { symbol, price, quantity, side } = data;
-    const updatedOrderBooks = { ...orderBooks };
-
-    // Determine the correct side of the order book
-    const sideKey = side === "bid" ? "bids" : "asks";
-    const orders = updatedOrderBooks[symbol][sideKey];
-
-    if (type === "order") {
-      // Add or update the quantity at the specified price
-      orders[price] = (orders[price] || 0) + quantity;
-    } else if (type === "execution") {
-      // Subtract the executed quantity
-      if (orders[price] !== undefined) {
-        const remainingQuantity = orders[price] - quantity;
-        if (remainingQuantity <= 0) {
-          delete orders[price]; // Remove the price level if quantity is zero or less
-        } else {
-          orders[price] = remainingQuantity;
-        }
-      }
-    }
-
-    setOrderBooks(updatedOrderBooks);
-  };
-
-
   return (
     <div className="container">
       <div className="controls">
@@ -91,7 +61,7 @@ const App = () => {
   </select>
 </div>
 <OrderBookChart orderBookData={orderBooks[selectedSymbol]} />
-{/* <PriceEvolutionChart /> */}
+ <PriceEvolutionChart averages={averages}/>
 
     </div>
   );
