@@ -25,7 +25,7 @@ async function streamOrders(cvs_filepath) {
         persistent: true,
       });
       // Limit the rate
-      await sleep(100); // 50ms delay = 20 messages/sec
+      await sleep(200); // 200ms delay = 5 messages/sec
     } catch (error) {
       console.error("Error processing line:", line, error);
     }
@@ -34,8 +34,6 @@ async function streamOrders(cvs_filepath) {
   console.log("Finished streaming orders. Closing connection in 5 seconds...");
   setTimeout(() => connection.close(), 5000);
 }
-
-
 
 function parseLine(line) {
   const fields = line.split(",");

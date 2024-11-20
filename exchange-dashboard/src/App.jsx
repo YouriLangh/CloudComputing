@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import OrderBookChart from "./OrderBookChart";
 import PriceEvolutionChart from "./PriceEvolutionChart";
 const App = () => {
-    const [ws, setWs] = useState(null);
+  const [ws, setWs] = useState(null);
   const [orderBooks, setOrderBooks] = useState({
     AAPL: { bids: {}, asks: {} },
     GOOGL: { bids: {}, asks: {} },
@@ -25,19 +25,19 @@ const App = () => {
     };
 
     socket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        console.log("Received data:", message);
-        if(message.data.averages !== undefined && message.data.orderBook !== undefined){
-          const { averages, orderBook } = message.data;
-          console.log("Received averages:", averages);
-          console.log("Received orderBook:", orderBook);
-          if(averages.length > 0) setAverages(averages);
-          setOrderBooks((prevOrderBooks) => ({
-            ...prevOrderBooks,
-            [selectedSymbol]: orderBook,
-          }));
-        }
-      };
+      const message = JSON.parse(event.data);
+      console.log("Received data:", message);
+      if (message.type === "orderbook") {
+        const { orderBook } = message.data;
+        setOrderBooks((prevOrderBooks) => ({
+          ...prevOrderBooks,
+          [selectedSymbol]: orderBook,
+        }));
+      } else if (message.type === "averages") {
+        const { averages } = message.data;
+        setAverages(averages);
+      }
+    };
     setWs(socket);
 
     socket.onclose = () => {
@@ -52,17 +52,19 @@ const App = () => {
   return (
     <div className="container">
       <div className="controls">
-  <select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}>
-    {Object.keys(orderBooks).map((symbol) => (
-      <option key={symbol} value={symbol}>
-        {symbol}
-      </option>
-    ))}
-  </select>
-</div>
-<OrderBookChart orderBookData={orderBooks[selectedSymbol]} />
- <PriceEvolutionChart averages={averages}/>
-
+        <select
+          value={selectedSymbol}
+          onChange={(e) => setSelectedSymbol(e.target.value)}
+        >
+          {Object.keys(orderBooks).map((symbol) => (
+            <option key={symbol} value={symbol}>
+              {symbol}
+            </option>
+          ))}
+        </select>
+      </div>
+      <OrderBookChart orderBookData={orderBooks[selectedSymbol]} />
+      <PriceEvolutionChart averages={averages} />
     </div>
   );
 };
