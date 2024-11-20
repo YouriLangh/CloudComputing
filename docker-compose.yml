@@ -21,7 +21,7 @@ services:
       rabbitmq:
         condition: service_healthy # Wait for RabbitMQ to be healthy
     environment:
-      - RABBITMQ_URL=amqp://rabbitmq:5673
+      - RABBITMQ_URL=amqp://rabbitmq
     restart: on-failure
     volumes:
       - ./client_order_streamer/data:/app/data
