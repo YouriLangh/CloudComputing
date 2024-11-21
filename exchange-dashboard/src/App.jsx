@@ -3,13 +3,10 @@ import OrderBookChart from "./OrderBookChart";
 import PriceEvolutionChart from "./PriceEvolutionChart";
 const App = () => {
   const [ws, setWs] = useState(null);
-  const pseudoBid = {99: 100, 98: 200, 97: 300, 96: 400, 95: 500};
-  const pseudoAsk = {101: 100, 102: 200, 103: 300, 104: 400, 105: 500};
-  const [orderBook, setOrderBook] = useState({ bids: pseudoBid, asks: pseudoAsk });
+  const [orderBook, setOrderBook] = useState({ bids: {}, asks: {} });
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const [averages, setAverages] = useState([]);
   const symbols = ["AAPL", "GOOGL", "MSFT", "AMZN"];
-
 
   useEffect(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {

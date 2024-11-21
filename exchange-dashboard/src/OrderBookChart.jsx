@@ -21,38 +21,40 @@ const OrderBookChart = ({ orderBookData }) => {
   const minPrice = allPrices[0];
   const maxPrice = allPrices[allPrices.length - 1];
 
-  // Prepare data for the chart
-  const data = allPrices.map((price) => ({
-    price: price, // Ensure price is a numeric value
-    bids: bids[price] || null,
-    asks: asks[price] || null,
-  }));
+  // Prepare data for the chart (combine bids and asks into a single field)
+  const data = allPrices.map((price) => {
+    const isBid = bids[price] !== undefined;
+    return {
+      price, // Ensure price is a numeric value
+      value: isBid ? bids[price] : asks[price],
+      fill: isBid ? "green" : "red", // Dynamically set the fill color
+    };
+  });
+
+  // Custom Tooltip Component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const { fill, value } = payload[0];
+      const type = fill === "green" ? "Bid" : "Ask";
+
       return (
         <div
           className="custom-tooltip"
           style={{ backgroundColor: "white", border: "1px solid black" }}
         >
-          <div>
-            {payload.map((pld, index) => (
-              <div
-                key={index} // Add a unique key here
-                style={{ display: "inline-block", padding: 10 }}
-              >
-                <div style={{ color: pld.fill }}>
-                  {pld.value} {pld.dataKey}
-                </div>
-                <div style={{ color: pld.fill }}>at {`$${label}`}</div>
-              </div>
-            ))}
+          <div style={{ display: "inline-block", padding: 10 }}>
+            <div style={{ color: fill }}>
+              {type}: {value}
+            </div>
+            <div style={{ color: fill }}>at ${label}</div>
           </div>
         </div>
       );
     }
-  
+
     return null;
   };
+
   return (
     <ResponsiveContainer width="100%" height={700}>
       <BarChart
@@ -75,8 +77,11 @@ const OrderBookChart = ({ orderBookData }) => {
           }}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: "gray" }} />
-        <Bar dataKey="bids" fill="green" />
-        <Bar dataKey="asks" fill="red" />
+        <Bar
+          dataKey="value"
+          fill="#8884d8"
+          name="Order Volume"
+        />
       </BarChart>
     </ResponsiveContainer>
   );
