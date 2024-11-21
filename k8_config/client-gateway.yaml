@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-gateway
+  template:
+    metadata:
+      labels:
+        app: client-gateway
+    spec:
+      containers:
+        - name: client-gateway-container
+          image: client-gateway:latest
+          env:
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+            - name: RABBITMQ_QUEUE
+              value: order_manager_queue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-gateway-service
+spec:
+  selector:
+    app: client-gateway
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP

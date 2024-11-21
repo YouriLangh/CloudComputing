@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: order-manager
+spec:
+  selector:
+    matchLabels:
+      app: order-manager
+  serviceName: "order-manager"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: order-manager
+    spec:
+      containers:
+        - name: order-manager-container
+          image: order-manager:latest
+          env:
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+            - name: RABBITMQ_QUEUE
+              value: orders_queue
+            - name: RABBITMQ_OUT_QUEUE
+              value: processed_orders_queue
+          volumeMounts:
+            - name: order-manager-storage
+              mountPath: /data
+      volumes:
+        - name: order-manager-storage
+          persistentVolumeClaim:
+            claimName: order-manager-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-manager-service
+spec:
+  selector:
+    app: order-manager
+  type: ClusterIP
+  ports:
+    - port: 9999            # The port exposed by the service inside the cluster
+      targetPort: 9999       # The port the container listens on 
+      protocol: TCP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: order-manager-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

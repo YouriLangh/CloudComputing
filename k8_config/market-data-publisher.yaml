@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: market-data-publisher
+spec:
+  selector:
+    matchLabels:
+      app: market-data-publisher
+  serviceName: "market-data-publisher"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: market-data-publisher
+    spec:
+      containers:
+        - name: market-data-publisher-container
+          image: market-data-publisher:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: RABBITMQ_HOST
+              value: rabbitmq
+            - name: RABBITMQ_QUEUE
+              value: processed_orders_queue
+          volumeMounts:
+            - name: mdp-storage
+              mountPath: /data
+      volumes:
+        - name: mdp-storage
+          persistentVolumeClaim:
+            claimName: mdp-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-data-publisher-service
+spec:
+  selector:
+    app: market-data-publisher
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: LoadBalancer      
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mdp-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi      

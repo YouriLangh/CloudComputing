@@ -51,8 +51,6 @@ async function consumeAndForwardOrders() {
     channel.consume(ORDER_QUEUE, async (msg) => {
       if (msg !== null) {
         const order = JSON.parse(msg.content.toString());
-        const { price } = order;
-
         // Validate the order
         if (validateOrder(order)) {
           // Forward to the Order Manager queue

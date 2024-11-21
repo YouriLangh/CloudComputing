@@ -3,6 +3,8 @@ const split2 = require("split2");
 const amqp = require("amqplib");
 const assert = require("assert");
 
+const RABBITMQ_URL = "amqp://rabbitmq";
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
