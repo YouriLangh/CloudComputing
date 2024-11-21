@@ -4,8 +4,8 @@
 kubectl apply -f ./k8_config/rabbitmq.yaml
 
 # Step 2: Wait for RabbitMQ to become ready
-echo "Waiting for RabbitMQ to initialize (20 seconds)..."
-sleep 20
+echo "Waiting for RabbitMQ to initialize (30 seconds)..."
+sleep 30
 
 # Step 3: Deploy client-gateway
 kubectl apply -f ./k8_config/client-gateway.yaml

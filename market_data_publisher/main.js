@@ -3,8 +3,10 @@ const WebSocket = require("ws");
 const { Observable } = require("rxjs");
 const { groupBy, map, mergeMap, scan, bufferTime } = require("rxjs/operators");
 
-const RABBITMQ_URL = "amqp://rabbitmq";
-const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
+// Environment variables for RabbitMQ connection
+const RABBITMQ_HOST = process.env.RABBITMQ_HOST;
+const RABBITMQ_PORT = process.env.RABBITMQ_PORT;
+const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
 
 // History data structure to store computed averages
 const averagePriceHistory = {
@@ -87,7 +89,8 @@ function processExecution(data) {
 
 // Create an Observable for RabbitMQ orders
 const orderStream = new Observable(async (subscriber) => {
-  const connection = await amqp.connect(RABBITMQ_URL);
+  const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
+  const connection = await amqp.connect(connectionString);
   const channel = await connection.createChannel();
 
   await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });

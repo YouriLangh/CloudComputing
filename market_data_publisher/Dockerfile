@@ -13,5 +13,7 @@ RUN npm install
 # Copy the rest of your application code
 COPY . .
 
+EXPOSE 8080
+
 # Command to run your application
 CMD ["node", "main.js"]

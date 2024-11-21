@@ -15,10 +15,15 @@ spec:
       containers:
         - name: client-gateway-container
           image: client-gateway:latest
+          imagePullPolicy: Never
           env:
             - name: RABBITMQ_HOST
-              value: rabbitmq
-            - name: RABBITMQ_QUEUE
+              value: rabbitmq-service  # Use the service name
+            - name: RABBITMQ_PORT
+              value: "5672" 
+            - name: RABBITMQ_ORDER_QUEUE
+              value: orders  
+            - name: RABBITMQ_MANAGER_QUEUE
               value: order_manager_queue
 ---
 apiVersion: v1

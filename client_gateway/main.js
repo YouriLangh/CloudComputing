@@ -1,10 +1,10 @@
 const amqp = require("amqplib");
 
 // Environment variables for RabbitMQ connection
-const ORDER_QUEUE = "orders"; // Queue where the Order Streamer publishes orders
-const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders to the Order Manager
-
-const RABBITMQ_URL = "amqp://rabbitmq";
+const RABBITMQ_HOST = process.env.RABBITMQ_HOST;
+const RABBITMQ_PORT = process.env.RABBITMQ_PORT;
+const ORDER_QUEUE = process.env.RABBITMQ_ORDER_QUEUE;
+const ORDER_MANAGER_QUEUE = process.env.RABBITMQ_MANAGER_QUEUE;
 
 // Function to validate orders
 function validateOrder(order) {
@@ -38,7 +38,8 @@ function validateOrder(order) {
 // Connect to RabbitMQ and consume orders from the 'orders' queue
 async function consumeAndForwardOrders() {
   try {
-    const connection = await amqp.connect(RABBITMQ_URL);
+    const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
+    const connection = await amqp.connect(connectionString);
     const channel = await connection.createChannel();
 
     // Ensure the queues exist

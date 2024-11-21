@@ -18,14 +18,6 @@ spec:
           ports:
             - containerPort: 5672
             - containerPort: 15672
-          readinessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - ping
-                - status
-            initialDelaySeconds: 10
-            periodSeconds: 5
 ---
 apiVersion: v1
 kind: Service
@@ -36,9 +28,9 @@ spec:
     app: rabbitmq
   ports:
     - name: amqp-port
-      port: 5673
+      port: 5672
       targetPort: 5672
     - name: http-port
-      port: 15673
+      port: 15672
       targetPort: 15672
   type: ClusterIP

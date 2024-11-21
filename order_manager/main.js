@@ -1,11 +1,14 @@
 const amqp = require("amqplib");
-const { MatchingEngine, EngineOrder } = require("/app/matching-engine");
+const { MatchingEngine, EngineOrder } = require("./matching-engine");
 
 let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
 
-const ORDER_MANAGER_QUEUE = "order_manager_queue"; // Queue for validated orders
-const ORDERBOOK_QUEUE = "orderbook_queue"; // Unified queue for orders and executions
-const RABBITMQ_URL = "amqp://rabbitmq"; // RabbitMQ connection URL
+// Environment variables for RabbitMQ connection
+const RABBITMQ_HOST = process.env.RABBITMQ_HOST;
+const RABBITMQ_PORT = process.env.RABBITMQ_PORT;
+const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
+const ORDER_MANAGER_QUEUE = process.env.RABBITMQ_MANAGER_QUEUE;
+
 
 class SequentialNumberGenerator {
   constructor(start = 1) {
@@ -20,7 +23,8 @@ class SequentialNumberGenerator {
 const seqGen = new SequentialNumberGenerator();
 
 async function setupRabbitMQ() {
-  const connection = await amqp.connect(RABBITMQ_URL);
+  const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
+  const connection = await amqp.connect(connectionString);
   const channel = await connection.createChannel();
 
   // Declare the queues

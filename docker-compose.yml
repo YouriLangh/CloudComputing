@@ -43,8 +43,6 @@ services:
     environment:
       - RABBITMQ_URL=amqp://rabbitmq:5673
     restart: on-failure
-    volumes:
-      - ./matching-engine:/app/matching-engine # Mount matching-engine folder
 
   market_data_publisher:
     build: ./market_data_publisher
