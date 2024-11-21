@@ -13,8 +13,8 @@ const OrderBookChart = ({ orderBookData }) => {
   const { bids, asks } = orderBookData;
 
   // Extract unique prices from bids and asks
-  const bidPrices = Object.keys(bids).map(Number);
-  const askPrices = Object.keys(asks).map(Number);
+  const bidPrices = Object.keys(bids).map(parseFloat);
+  const askPrices = Object.keys(asks).map(parseFloat);
   const allPrices = Array.from(new Set([...bidPrices, ...askPrices])).sort(
     (a, b) => a - b
   );
@@ -23,11 +23,36 @@ const OrderBookChart = ({ orderBookData }) => {
 
   // Prepare data for the chart
   const data = allPrices.map((price) => ({
-    price,
+    price: price, // Ensure price is a numeric value
     bids: bids[price] || null,
     asks: asks[price] || null,
   }));
-
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div
+          className="custom-tooltip"
+          style={{ backgroundColor: "white", border: "1px solid black" }}
+        >
+          <div>
+            {payload.map((pld, index) => (
+              <div
+                key={index} // Add a unique key here
+                style={{ display: "inline-block", padding: 10 }}
+              >
+                <div style={{ color: pld.fill }}>
+                  {pld.value} {pld.dataKey}
+                </div>
+                <div style={{ color: pld.fill }}>at {`$${label}`}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+  
+    return null;
+  };
   return (
     <ResponsiveContainer width="100%" height={700}>
       <BarChart
@@ -39,7 +64,7 @@ const OrderBookChart = ({ orderBookData }) => {
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
           dataKey="price"
-          domain={[minPrice, maxPrice]}
+          domain={minPrice !== undefined && maxPrice !== undefined ? [minPrice, maxPrice] : undefined}
           label={{ value: "Order Price", position: "insideBottom", offset: -5 }}
         />
         <YAxis
@@ -49,12 +74,7 @@ const OrderBookChart = ({ orderBookData }) => {
             position: "insideLeft",
           }}
         />
-        <Tooltip />
-        <Tooltip
-          formatter={(value, name) =>
-            value !== null ? [value, name === "bids" ? "Bids" : "Asks"] : null
-          }
-        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "gray" }} />
         <Bar dataKey="bids" fill="green" />
         <Bar dataKey="asks" fill="red" />
       </BarChart>

@@ -6,7 +6,6 @@ const { groupBy, map, mergeMap, scan, bufferTime } = require("rxjs/operators");
 const RABBITMQ_URL = "amqp://rabbitmq";
 const ORDERBOOK_QUEUE = "orderbook_queue"; // RabbitMQ queue for unified messages
 
-let elapsedSeconds = 0;
 // History data structure to store computed averages
 const averagePriceHistory = {
   AAPL: [],
@@ -40,7 +39,7 @@ wss.on("connection", (ws) => {
   updateDashboard("AAPL", {
     averages: averagePriceHistory["AAPL"],
     orderBook: orderBooks["AAPL"],
-  });
+  }, "initial");
 
   // Listen for subscription changes from the dashboard
   ws.on("message", (message) => {
@@ -122,7 +121,7 @@ orderStream
     mergeMap((group$) =>
       group$.pipe(
         // Group orders into 1-minute windows
-        bufferTime(60000), // Buffer for 1 minute
+        bufferTime(60000), // Buffer for 60 seconds
 
         // For each 1-minute window, compute average prices
         map((orders) => {
@@ -193,4 +192,4 @@ setInterval(() => {
     };
     updateDashboard(symbol, data, type);
   });
-}, 1000); // Publish every second
+}, 1000); // Publish every  1 second
