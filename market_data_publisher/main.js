@@ -86,7 +86,7 @@ function processExecution(data) {
     }
   }
 }
-
+//TODO: ONLY SEND DATA WHEN DATA is != empty
 // Create an Observable for RabbitMQ orders
 const orderStream = new Observable(async (subscriber) => {
   const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
