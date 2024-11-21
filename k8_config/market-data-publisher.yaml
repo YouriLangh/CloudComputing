@@ -1,12 +1,13 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: market-data-publisher
 spec:
+  serviceName: "market-data-publisher-service"
+  replicas: 1
   selector:
     matchLabels:
       app: market-data-publisher
-  replicas: 1
   template:
     metadata:
       labels:
@@ -22,9 +23,21 @@ spec:
             - name: RABBITMQ_HOST
               value: rabbitmq-service  # Use the service name
             - name: RABBITMQ_PORT
-              value: "5672" 
+              value: "5672"
             - name: RABBITMQ_ORDERBOOK_QUEUE
               value: orderbook_queue  
+          volumeMounts:
+            - name: data-volume
+              mountPath: /app/data  # Mount the volume to the app's directory
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data-volume
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi 
 ---
 apiVersion: v1
 kind: Service
@@ -36,4 +49,4 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-  type: LoadBalancer      
+  type: LoadBalancer
