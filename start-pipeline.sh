@@ -1,4 +1,6 @@
 #!/bin/bash
+kubectl apply -f ./k8_config/redis.yaml
+
 # Step 1: Create RabbitMQ deployment
 kubectl apply -f ./k8_config/rabbitmq.yaml
 

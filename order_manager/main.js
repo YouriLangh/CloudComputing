@@ -1,22 +1,51 @@
 const amqp = require("amqplib");
-const { MatchingEngine, EngineOrder } = require("./matching-engine");
+const { RedisMatchingEngine, EngineOrder } = require("./redis_engine");
+const redis = require("redis");
 
-let matchingEngine = new MatchingEngine(["AAPL", "GOOGL", "MSFT", "AMZN"]);
+// Create a Redis client for Redis state
+const redisClient = redis.createClient({
+  host: process.env.REDIS_HOST || "redis-service",  // Redis service hostname
+  port: process.env.REDIS_PORT || 6379,            // Redis port (default: 6379)
+});
 
+redisClient.on("error", (err) => {
+  console.error("Error connecting to Redis:", err);
+});
+
+// Create a MatchingEngine that stores its state in Redis
+const matchingEngine = new RedisMatchingEngine(
+  ["AAPL", "GOOGL", "MSFT", "AMZN"], // Stock symbols
+  redisClient                         // Pass the redis client
+);
 // Environment variables for RabbitMQ connection
 const RABBITMQ_HOST = process.env.RABBITMQ_HOST;
 const RABBITMQ_PORT = process.env.RABBITMQ_PORT;
 const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
 const ORDER_MANAGER_QUEUE = process.env.RABBITMQ_MANAGER_QUEUE;
-
+const EXCHANGE_NAME = "order_manager_exchange";  // Add exchange name
 
 class SequentialNumberGenerator {
   constructor(start = 1) {
-    this.current = start;
+    this.key = "seq_number";  // Redis key to store the current sequence number
+    this.start = start;
+
+    // Initialize the sequence number in Redis if it doesn't exist
+    redisClient.setnx(this.key, this.start, (err, result) => {
+      if (result === 1) {
+        console.log(`Sequence number initialized to ${this.start}`);
+      }
+    });
   }
 
-  getNext() {
-    return this.current++; // returns the current number and then increments
+  async getNext() {
+    return new Promise((resolve, reject) => {
+      redisClient.incr(this.key, (err, newSeq) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(newSeq);
+      });
+    });
   }
 }
 
@@ -28,7 +57,15 @@ async function setupRabbitMQ() {
   const channel = await connection.createChannel();
 
   // Declare the queues
+  // Ensure the exchange exists (this should be the fanout exchange name)
+  await channel.assertExchange(EXCHANGE_NAME, 'fanout', { durable: true });
+  // Ensure the queue exists
   await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
+
+  // Bind the queue to the exchange (this makes sure this queue gets all messages from the exchange)
+  await channel.bindQueue(ORDER_MANAGER_QUEUE, EXCHANGE_NAME);
+
+
   await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
 
   console.log("RabbitMQ setup completed.");
@@ -37,8 +74,6 @@ async function setupRabbitMQ() {
 
 // Publish a message to RabbitMQ with a consistent sequence number
 function publishMessage(channel, messageType, queue, message) {
-  const timestamp = Date.now(); // Optional: Add a timestamp to ensure the order is traceable
-
   const fullMessage = {
     ...message,
     type: messageType,

@@ -158,4 +158,4 @@ class MatchingEngine {
     }
 }
 
-module.exports = { MatchingEngine, EngineOrder, OrderBook };
+module.exports = { MatchingEngine, EngineOrder };

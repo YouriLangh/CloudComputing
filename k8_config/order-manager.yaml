@@ -26,6 +26,10 @@ spec:
               value: orderbook_queue
             - name: RABBITMQ_MANAGER_QUEUE
               value: order_manager_queue
+            - name: REDIS_HOST
+              value: redis  # Your Redis service name
+            - name: REDIS_PORT
+              value: "6379"         # Default Redis port
           volumeMounts:
             - name: order-data-volume
               mountPath: /app/data  # Mount the volume to the app's directory
