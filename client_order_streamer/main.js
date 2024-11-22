@@ -10,7 +10,7 @@ function sleep(ms) {
 }
 
 async function streamOrders(cvs_filepath) {
-  const connection = await amqp.connect("amqp://rabbitmq");
+  const connection = await amqp.connect("amqp://localhost:5673");
   const channel = await connection.createChannel();
   const queue = "orders";
 
@@ -51,5 +51,6 @@ function parseLine(line) {
   };
 }
 
-const cvs_filepath = "/app/data/market_simulation_orders-1h.csv";
+// const cvs_filepath = "/app/data/market_simulation_orders-1h.csv";
+const cvs_filepath = "./data/market_simulation_orders-1h.csv";
 streamOrders(cvs_filepath);

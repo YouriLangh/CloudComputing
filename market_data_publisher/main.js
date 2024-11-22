@@ -51,6 +51,10 @@ wss.on("connection", (ws) => {
       if (symbol) {
         clientSubscriptions.set(ws, symbol);
         console.log(`Client subscribed to ${symbol}`);
+        updateDashboard(symbol, {
+          averages: averagePriceHistory[symbol],
+          orderBook: orderBooks[symbol],
+        }, "initial");
       }
     }
   });

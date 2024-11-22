@@ -38,11 +38,11 @@ function validateOrder(order) {
 // Connect to RabbitMQ and consume orders from the 'orders' queue
 async function consumeAndForwardOrders() {
   try {
-    const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
+    const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;
     const connection = await amqp.connect(connectionString);
     const channel = await connection.createChannel();
 
-    // Ensure the queues exist
+    // Set up the exchange and get a unique queue for this pod
     await channel.assertQueue(ORDER_QUEUE, { durable: true });
     await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
@@ -51,25 +51,24 @@ async function consumeAndForwardOrders() {
     // Start consuming messages
     channel.consume(ORDER_QUEUE, async (msg) => {
       if (msg !== null) {
+        console.log("Received order:", msg.content.toString)
         const order = JSON.parse(msg.content.toString());
-        // Validate the order
+        // Validate and forward the order to the Order Manager queue
         if (validateOrder(order)) {
-          // Forward to the Order Manager queue
           channel.sendToQueue(
             ORDER_MANAGER_QUEUE,
             Buffer.from(JSON.stringify(order)),
             { persistent: true }
           );
-
-          channel.ack(msg); // Acknowledge the message upon successful forwarding
+          channel.ack(msg); // Acknowledge the message
         } else {
           console.log("Order validation failed:", order);
-          channel.nack(msg); // Acknowledge invalid message to avoid reprocessing
+          channel.nack(msg); // Negative ack if validation fails
         }
       }
     });
   } catch (error) {
-    console.error("Failed to consume and forward orders:", error);
+    console.error("Failed to consume orders:", error);
   }
 }
 

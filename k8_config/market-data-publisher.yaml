@@ -23,7 +23,7 @@ spec:
             - name: RABBITMQ_HOST
               value: rabbitmq-service  # Use the service name
             - name: RABBITMQ_PORT
-              value: "5672"
+              value: "5673"
             - name: RABBITMQ_ORDERBOOK_QUEUE
               value: orderbook_queue  
           volumeMounts:

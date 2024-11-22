@@ -4,8 +4,12 @@
 kubectl apply -f ./k8_config/rabbitmq.yaml
 
 # Step 2: Wait for RabbitMQ to become ready
-echo "Waiting for RabbitMQ to initialize (30 seconds)..."
-sleep 30
+echo "Waiting for RabbitMQ to initialize (25 seconds)..."
+sleep 25
+
+# Forward RabbitMQ ports for external access (i can not use the original ports 5672 and 15672) in the background
+echo "Forwarding RabbitMQ ports for external access..."
+# kubectl port-forward service/rabbitmq-service 5673:5672 15673:15672 &
 
 # Step 3: Deploy client-gateway
 kubectl apply -f ./k8_config/client-gateway.yaml
