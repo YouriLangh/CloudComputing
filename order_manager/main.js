@@ -32,31 +32,40 @@ const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
 const ORDER_MANAGER_QUEUE = process.env.RABBITMQ_MANAGER_QUEUE;
 const EXCHANGE_NAME = "order_manager_exchange";  // Add exchange name
 
+// class SequentialNumberGenerator {
+//   constructor(start = 1) {
+//     this.key = "seq_number";  // Redis key to store the current sequence number
+//     this.start = start;
+
+//     // Initialize the sequence number in Redis if it doesn't exist
+//     redisClient.set(this.key, this.start, { NX: true }, (err, result) => {
+//       if (result === "OK") {
+//         console.log(`Sequence number initialized to ${this.start}`);
+//       }
+//     });
+//   }
+
+//   getNext() {
+//     try {
+//       const newSeq = redisClient.incr("seq_number");
+//       console.log("Next sequence:", newSeq);
+//       return newSeq;
+//     } catch (error) {
+//       console.error("Error getting next sequence:", error);
+//     }
+//   }
+// }
 class SequentialNumberGenerator {
   constructor(start = 1) {
-    this.key = "seq_number";  // Redis key to store the current sequence number
-    this.start = start;
-
-    // Initialize the sequence number in Redis if it doesn't exist
-    redisClient.set(this.key, this.start, { NX: true }, (err, result) => {
-      if (result === "OK") {
-        console.log(`Sequence number initialized to ${this.start}`);
-      }
-    });
+    this.current = start;  // Initialize the counter with the starting value
   }
 
-  async getNext() {
-    return new Promise((resolve, reject) => {
-      redisClient.incr(this.key, (err, newSeq) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(newSeq);
-      });
-    });
+  getNext() {
+    const seq = this.current;  // Store the current value before incrementing
+    this.current++;  // Increment the sequence number
+    return seq;  // Return the previous value (before incrementing)
   }
 }
-
 const seqGen = new SequentialNumberGenerator();
 
 async function setupRabbitMQ() {
@@ -64,30 +73,29 @@ async function setupRabbitMQ() {
   const connection = await amqp.connect(connectionString);
   const channel = await connection.createChannel();
 
-  // Declare the queues
-  // Ensure the exchange exists (this should be the fanout exchange name)
+  // Ensure the exchange exists
   await channel.assertExchange(EXCHANGE_NAME, 'fanout', { durable: true });
-  // Ensure the queue exists
+
+  // Ensure the manager queue exists
   await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
-  // Bind the queue to the exchange (this makes sure this queue gets all messages from the exchange)
-  await channel.bindQueue(ORDER_MANAGER_QUEUE, EXCHANGE_NAME);
-
-
-  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
-
+  // Ensure a dynamic queue is created and bind it to the exchange
+  const queueName = `orderbook_queue_${process.env.POD_NAME}`;
+  await channel.assertQueue(queueName, { durable: true });
+  await channel.bindQueue(queueName, EXCHANGE_NAME, '');  // Bind to the exchange
   console.log("RabbitMQ setup completed.");
   return { connection, channel };
 }
 
-// Publish a message to RabbitMQ with a consistent sequence number
-function publishMessage(channel, messageType, queue, message) {
+// Publish a message to the fanout exchange
+function publishMessage(channel, messageType, exchange, message) {
   const fullMessage = {
     ...message,
     type: messageType,
   };
 
-  channel.sendToQueue(queue, Buffer.from(JSON.stringify(fullMessage)));
+  // Publish the message to the exchange (not to a queue directly)
+  channel.publish(exchange, '', Buffer.from(JSON.stringify(fullMessage)));
 }
 
 // Execution handler for the matching engine
@@ -100,7 +108,7 @@ async function executionHandler(channel, ask_executions, bid_executions) {
 
   // Publish each execution to RabbitMQ
   for (const execution of all_executions) {
-    publishMessage(channel, "execution", ORDERBOOK_QUEUE, execution);
+    publishMessage(channel, "execution", EXCHANGE_NAME, execution);
   }
 }
 
@@ -112,6 +120,7 @@ async function consumeAndForwardOrders(channel) {
     if (msg !== null) {
       try {
         const rawOrder = JSON.parse(msg.content.toString());
+        console.log("Raw order received: ", rawOrder); // Add this line to inspect the raw order
         const processedOrder = processOrder(rawOrder);
 
         console.log(
@@ -119,7 +128,7 @@ async function consumeAndForwardOrders(channel) {
         );
 
         // Publish the order to RabbitMQ
-        publishMessage(channel, "order", ORDERBOOK_QUEUE, processedOrder);
+        publishMessage(channel, "order", EXCHANGE_NAME, processedOrder);
 
         // Create an EngineOrder instance from the parsed data
         const order = new EngineOrder(

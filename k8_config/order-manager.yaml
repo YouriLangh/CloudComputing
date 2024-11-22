@@ -26,8 +26,12 @@ spec:
               value: orderbook_queue
             - name: RABBITMQ_MANAGER_QUEUE
               value: order_manager_queue
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: REDIS_HOST
-              value: redis  # Your Redis service name
+              value: redis 
             - name: REDIS_PORT
               value: "6379"         # Default Redis port
           volumeMounts:

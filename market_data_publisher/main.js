@@ -1,27 +1,22 @@
 const amqp = require("amqplib");
 const WebSocket = require("ws");
 const { Observable } = require("rxjs");
-const { groupBy, map, mergeMap, scan, bufferTime } = require("rxjs/operators");
+const { groupBy, map, mergeMap, bufferTime } = require("rxjs/operators");
+const {
+  setOrderBook,
+  setAverages,
+  initializeState,
+} = require("./redisUtils");
 
 // Environment variables for RabbitMQ connection
 const RABBITMQ_HOST = process.env.RABBITMQ_HOST;
 const RABBITMQ_PORT = process.env.RABBITMQ_PORT;
 const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
+const EXCHANGE_NAME = "order_manager_exchange";  // Add exchange name
+const SYMBOLS = ["AAPL", "GOOGL", "MSFT", "AMZN"];
 
-// History data structure to store computed averages
-const averagePriceHistory = {
-  AAPL: [],
-  GOOGL: [],
-  MSFT: [],
-  AMZN: [],
-};
-// Initialize order books with empty objects for each symbol
-let orderBooks = {
-  AAPL: { bids: {}, asks: {} },
-  GOOGL: { bids: {}, asks: {} },
-  MSFT: { bids: {}, asks: {} },
-  AMZN: { bids: {}, asks: {} },
-};
+let orderBooks = { bids: {}, asks: {} };
+let averagePriceHistory = {};
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: 8080 });
@@ -51,10 +46,7 @@ wss.on("connection", (ws) => {
       if (symbol) {
         clientSubscriptions.set(ws, symbol);
         console.log(`Client subscribed to ${symbol}`);
-        updateDashboard(symbol, {
-          averages: averagePriceHistory[symbol],
-          orderBook: orderBooks[symbol],
-        }, "initial");
+        sendInitialDashboardData(ws, symbol);
       }
     }
   });
@@ -67,54 +59,81 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Function to process an order message
+// Publish initial dashboard data
+function sendInitialDashboardData(client, symbol) {
+  const orderBook = orderBooks[symbol];
+  const averages = averagePriceHistory[symbol];
+  const data = {
+    type: "initial",
+    data: { orderBook, averages },
+  };
+  client.send(JSON.stringify(data));
+}
+
+
+// Function to process incoming orders
 function processOrder(data) {
   const { price, symbol, quantity, side } = data;
-  // Add the order to the appropriate side (bids or asks)
+  // Ensure orderBooks for the symbol exist
+  if (!orderBooks[symbol]) {
+    orderBooks[symbol] = { bids: {}, asks: {} };
+  }
+
+  // Choose the appropriate side (bid or ask) based on order side
   const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
+
+  // Update the book with the new order
   bookSide[price] = (bookSide[price] || 0) + quantity;
+
+  // Set the updated orderBook in Redis
+  setOrderBook(symbol, orderBooks[symbol]);
 }
 
 // Function to handle order execution updates
 function processExecution(data) {
   const { price, symbol, quantity, side } = data;
+  // Ensure orderBooks for the symbol exist
+  if (!orderBooks[symbol]) {
+    orderBooks[symbol] = { bids: {}, asks: {} };
+  }
+
+  // Choose the appropriate side (bid or ask) based on order side
   const bookSide = orderBooks[symbol][side === "bid" ? "bids" : "asks"];
 
-  // Remove the quantity from the appropriate side (bids or asks)
+  // If the price exists, update the book
   if (bookSide[price] !== undefined) {
-    let remainingQuantity = bookSide[price] - quantity;
+    const remainingQuantity = bookSide[price] - quantity;
     if (remainingQuantity <= 0) {
-      delete bookSide[price]; // Remove the entry if quantity goes to zero or below
+      delete bookSide[price]; // Remove the price if quantity is 0 or less
     } else {
-      bookSide[price] = remainingQuantity; // Update the entry with remaining quantity
+      bookSide[price] = remainingQuantity; // Update the quantity
     }
   }
+
+  // Set the updated orderBook in Redis
+  setOrderBook(symbol, orderBooks[symbol]);
 }
-//TODO: ONLY SEND DATA WHEN DATA is != empty
+
 // Create an Observable for RabbitMQ orders
 const orderStream = new Observable(async (subscriber) => {
-  const connectionString = `amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`;  // Use environment variables here
-  const connection = await amqp.connect(connectionString);
+  const connection = await amqp.connect(`amqp://${RABBITMQ_HOST}:${RABBITMQ_PORT}`);
   const channel = await connection.createChannel();
 
-  await channel.assertQueue(ORDERBOOK_QUEUE, { durable: true });
+  await channel.assertExchange(EXCHANGE_NAME, "fanout", { durable: true });
+  const queueName = `orderbook_queue_${process.env.POD_NAME}`;
+  await channel.assertQueue(queueName, { durable: false });
+  await channel.bindQueue(queueName, EXCHANGE_NAME, "");
 
-  console.log("Consuming from RabbitMQ...");
-
-  channel.consume(ORDERBOOK_QUEUE, (msg) => {
-    if (msg !== null) {
-      const data = JSON.parse(msg.content.toString());
-      const { type, ...content } = data;
-      console.log(
-        `Received ${type} message w data: ${JSON.stringify(content)}`
-      );
-      if (type === "order") {
-        subscriber.next(data); // Emit the order to the stream
-        processOrder(content);
-      } else if (type === "execution") {
-        processExecution(content);
+  channel.consume(queueName, (msg) => {
+    if (msg) {
+      const messageData = JSON.parse(msg.content.toString());
+      // Process orders or executions
+      if (messageData.type === "order") {
+        processOrder(messageData); // Process new order
+      } else if (messageData.type === "execution") {
+        processExecution(messageData); // Process order execution
       }
-
+      subscriber.next(messageData); // Push the message to the subscriber
       channel.ack(msg); // Acknowledge the message
     }
   });
@@ -123,53 +142,19 @@ const orderStream = new Observable(async (subscriber) => {
 // Process the order stream and compute averages
 orderStream
   .pipe(
-    // Group by stock symbol
     groupBy((order) => order.symbol),
     mergeMap((group$) =>
       group$.pipe(
-        // Group orders into 1-minute windows
-        bufferTime(60000), // Buffer for 60 seconds
-
-        // For each 1-minute window, compute average prices
-        map((orders) => {
-          const bids = { totalPrice: 0, totalQuantity: 0 };
-          const asks = { totalPrice: 0, totalQuantity: 0 };
-
-          // Accumulate prices and quantities
-          orders.forEach((order) => {
-            if (order.side === "bid") {
-              bids.totalPrice += order.price * order.quantity;
-              bids.totalQuantity += order.quantity;
-            } else if (order.side === "ask") {
-              asks.totalPrice += order.price * order.quantity;
-              asks.totalQuantity += order.quantity;
-            }
-          });
-
-          return {
-            symbol: group$.key,
-            minuteTimestamp: new Date().toISOString(),
-            avgBidPrice:
-              bids.totalQuantity > 0 ? bids.totalPrice / bids.totalQuantity : 0,
-            avgAskPrice:
-              asks.totalQuantity > 0 ? asks.totalPrice / asks.totalQuantity : 0,
-          };
-        })
+        bufferTime(60000),
+        map((orders) => computeAverages(group$.key, orders))
       )
     )
   )
-  .subscribe((average) => {
-    console.log("Computed Average:", average);
-
-    // Store the computed average in the history data structure
-    const { symbol, minuteTimestamp, avgBidPrice, avgAskPrice } = average;
-    const data = {
-      minuteTimestamp,
-      avgBidPrice,
-      avgAskPrice,
-    };
-    averagePriceHistory[symbol].push(data);
-    updateDashboard(symbol, averagePriceHistory[symbol], "averages");
+  .subscribe(async (average) => {
+    const { symbol } = average;
+    averagePriceHistory[symbol].push(average);
+    await setAverages(symbol, averagePriceHistory[symbol]);
+    broadcastUpdates(symbol, { averages: averagePriceHistory[symbol] }, "averages");
   });
 
 // Publish updates to WebSocket clients
@@ -186,15 +171,14 @@ function updateDashboard(symbol, data, type) {
   });
 }
 
-// Start the application
-orderStream.subscribe(); // Start the order stream
+
 
 setInterval(() => {
   clients.forEach((client) => {
     let type = "orderbook";
     const symbol = clientSubscriptions.get(client);
     const orderBook = orderBooks[symbol];
-    if (!(Object.keys(orderBook.bids).length === 0 && Object.keys(orderBook.asks).length === 0)) {
+    if (Object.keys(orderBook.bids).length || Object.keys(orderBook.asks).length) {
       data = {
         orderBook: orderBook,
       };
@@ -202,3 +186,47 @@ setInterval(() => {
     }
   });
 }, 1000); // Publish every  1 second
+
+function computeAverages(symbol, orders) {
+  const bids = { totalPrice: 0, totalQuantity: 0 };
+  const asks = { totalPrice: 0, totalQuantity: 0 };
+
+  orders.forEach(({ price, quantity, side }) => {
+    if (side === "bid") {
+      bids.totalPrice += price * quantity;
+      bids.totalQuantity += quantity;
+    } else if (side === "ask") {
+      asks.totalPrice += price * quantity;
+      asks.totalQuantity += quantity;
+    }
+  });
+
+  return {
+    symbol,
+    minuteTimestamp: new Date().toISOString(),
+    avgBidPrice: bids.totalQuantity ? bids.totalPrice / bids.totalQuantity : 0,
+    avgAskPrice: asks.totalQuantity ? asks.totalPrice / asks.totalQuantity : 0,
+  };
+}
+
+// Broadcast updates to relevant WebSocket clients
+function broadcastUpdates(symbol, data, type) {
+  const message = JSON.stringify({ type, data });
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN && clientSubscriptions.get(client) === symbol) {
+      client.send(message);
+    }
+  });
+}
+
+// Load initial state from Redis and start the application
+(async () => {
+  const state = await initializeState(SYMBOLS);
+  console.log("Initial state loaded", state);
+  console.log("orderbooks before", orderBooks);
+  orderBooks = state.orderBooks;
+  console.log("orderbooks after", orderBooks);
+  averagePriceHistory = state.averagePriceHistory;
+  console.log("Initial state loaded");
+  orderStream.subscribe(); // Start the order stream
+})();
