@@ -51,7 +51,6 @@ async function consumeAndForwardOrders() {
     // Start consuming messages
     channel.consume(ORDER_QUEUE, async (msg) => {
       if (msg !== null) {
-        console.log("Received order:", msg.content.toString)
         const order = JSON.parse(msg.content.toString());
         // Validate and forward the order to the Order Manager queue
         if (validateOrder(order)) {

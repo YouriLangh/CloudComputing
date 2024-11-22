@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Step 1: Create RabbitMQ deployment
 kubectl apply -f ./k8_config/rabbitmq.yaml
 
@@ -7,13 +6,11 @@ kubectl apply -f ./k8_config/rabbitmq.yaml
 echo "Waiting for RabbitMQ to initialize (25 seconds)..."
 sleep 25
 
-# Forward RabbitMQ ports for external access (i can not use the original ports 5672 and 15672) in the background
-echo "Forwarding RabbitMQ ports for external access..."
-# kubectl port-forward service/rabbitmq-service 5673:5672 15673:15672 &
+kubectl apply -f ./k8_config/metric-server-components.yaml
 
-# Step 3: Deploy client-gateway
+# Step 3: Deploy client-gateway & HPA
 kubectl apply -f ./k8_config/client-gateway.yaml
-
+kubectl apply -f ./k8_config/client-gateway-hpa.yaml
 # Step 4: Deploy order-manager
 kubectl apply -f ./k8_config/order-manager.yaml
 

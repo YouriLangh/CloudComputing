@@ -25,6 +25,13 @@ spec:
               value: orders  
             - name: RABBITMQ_MANAGER_QUEUE
               value: order_manager_queue
+          resources:
+            limits:
+              cpu: 350m
+              memory: 128M
+            requests:
+              cpu: 200m
+              memory: 80M
 ---
 apiVersion: v1
 kind: Service
