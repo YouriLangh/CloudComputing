@@ -32,40 +32,40 @@ const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
 const ORDER_MANAGER_QUEUE = process.env.RABBITMQ_MANAGER_QUEUE;
 const EXCHANGE_NAME = "order_manager_exchange";  // Add exchange name
 
+class SequentialNumberGenerator {
+  constructor(key = "seq_number", start = 1) {
+    this.key = key;  // Redis key to store the current sequence number
+    this.start = start;
+
+    // Initialize the sequence number in Redis if it doesn't exist
+    redisClient.set(this.key, this.start, "NX").then((result) => {
+      if (result === "OK") {
+        console.log(`Sequence number initialized to ${this.start}`);
+      }
+    });
+  }
+
+  async getNext() {
+    try {
+      const seq = await redisClient.incr(this.key); // Increment and get the new sequence
+      return seq;
+    } catch (error) {
+      console.error("Error getting next sequence:", error);
+      throw error;
+    }
+  }
+}
 // class SequentialNumberGenerator {
 //   constructor(start = 1) {
-//     this.key = "seq_number";  // Redis key to store the current sequence number
-//     this.start = start;
-
-//     // Initialize the sequence number in Redis if it doesn't exist
-//     redisClient.set(this.key, this.start, { NX: true }, (err, result) => {
-//       if (result === "OK") {
-//         console.log(`Sequence number initialized to ${this.start}`);
-//       }
-//     });
+//     this.current = start;  // Initialize the counter with the starting value
 //   }
 
 //   getNext() {
-//     try {
-//       const newSeq = redisClient.incr("seq_number");
-//       console.log("Next sequence:", newSeq);
-//       return newSeq;
-//     } catch (error) {
-//       console.error("Error getting next sequence:", error);
-//     }
+//     const seq = this.current;  // Store the current value before incrementing
+//     this.current++;  // Increment the sequence number
+//     return seq;  // Return the previous value (before incrementing)
 //   }
 // }
-class SequentialNumberGenerator {
-  constructor(start = 1) {
-    this.current = start;  // Initialize the counter with the starting value
-  }
-
-  getNext() {
-    const seq = this.current;  // Store the current value before incrementing
-    this.current++;  // Increment the sequence number
-    return seq;  // Return the previous value (before incrementing)
-  }
-}
 const seqGen = new SequentialNumberGenerator();
 
 async function setupRabbitMQ() {
@@ -121,7 +121,7 @@ async function consumeAndForwardOrders(channel) {
       try {
         const rawOrder = JSON.parse(msg.content.toString());
         console.log("Raw order received: ", rawOrder); // Add this line to inspect the raw order
-        const processedOrder = processOrder(rawOrder);
+        const processedOrder = await processOrder(rawOrder);
 
         console.log(
           `Order received: ${processedOrder.side} ${processedOrder.quantity} of ${processedOrder.symbol} at ${processedOrder.price}`
@@ -153,8 +153,8 @@ async function consumeAndForwardOrders(channel) {
   });
 }
 
-function processOrder(order) {
-  order.secnum = seqGen.getNext();
+async function processOrder(order) {
+  order.secnum = await seqGen.getNext();
   order.price = parseFloat(order.price);
   order.quantity = parseInt(order.quantity);
   delete order.user_id;
