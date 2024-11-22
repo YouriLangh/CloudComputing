@@ -4,7 +4,7 @@ metadata:
   name: order-manager
 spec:
   serviceName: "order-manager-service"
-  replicas: 1
+  replicas: 1 
   selector:
     matchLabels:
       app: order-manager
@@ -33,6 +33,13 @@ spec:
           volumeMounts:
             - name: order-data-volume
               mountPath: /app/data  # Mount the volume to the app's directory
+          resources:
+            limits:
+              cpu: 350m
+              memory: 128M
+            requests:
+              cpu: 200m
+              memory: 80M
 
   volumeClaimTemplates:
     - metadata:
@@ -42,6 +49,7 @@ spec:
         resources:
           requests:
             storage: 1Gi  # Define the size of the persistent volume (adjust as needed)
+
 ---
 apiVersion: v1
 kind: Service
@@ -55,3 +63,24 @@ spec:
     - port: 9999            # The port exposed by the service inside the cluster
       targetPort: 9999       # The port the container listens on 
       protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-manager-hpa
+  namespace: default  # Specify the namespace
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: order-manager  # Name of the StatefulSet to scale
+  minReplicas: 1  # Minimum number of replicas
+  maxReplicas: 5  # Maximum number of replicas
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu  # Can also use memory if you prefer
+        target:
+          type: Utilization
+          averageUtilization: 80  # Trigger scaling when CPU utilization exceeds 80%

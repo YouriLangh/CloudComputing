@@ -12,8 +12,8 @@ kubectl apply -f ./k8_config/metric-server-components.yaml
 
 # Step 3: Deploy client-gateway & HPA
 kubectl apply -f ./k8_config/client-gateway.yaml
-kubectl apply -f ./k8_config/client-gateway-hpa.yaml
-# Step 4: Deploy order-manager
+
+# Step 4: Deploy order-manager & HPA
 kubectl apply -f ./k8_config/order-manager.yaml
 
 # Step 5: Deploy market-data-publisher
