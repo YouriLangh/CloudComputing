@@ -4,13 +4,21 @@ const redis = require("redis");
 
 // Create a Redis client for Redis state
 const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || "redis-service",  // Redis service hostname
-  port: process.env.REDIS_PORT || 6379,            // Redis port (default: 6379)
+  url: `redis://${process.env.REDIS_HOST || "redis-service"}:${process.env.REDIS_PORT || 6379}`,
 });
 
-redisClient.on("error", (err) => {
-  console.error("Error connecting to Redis:", err);
-});
+// Use Redis client's promise-based API
+async function connectToRedis() {
+  try {
+    await redisClient.connect();
+    console.log("Redis is connected and ready!");
+  } catch (error) {
+    console.error("Error connecting to Redis:", error);
+  }
+}
+
+// Call the function to connect to Redis
+connectToRedis();
 
 // Create a MatchingEngine that stores its state in Redis
 const matchingEngine = new RedisMatchingEngine(
@@ -30,8 +38,8 @@ class SequentialNumberGenerator {
     this.start = start;
 
     // Initialize the sequence number in Redis if it doesn't exist
-    redisClient.setnx(this.key, this.start, (err, result) => {
-      if (result === 1) {
+    redisClient.set(this.key, this.start, { NX: true }, (err, result) => {
+      if (result === "OK") {
         console.log(`Sequence number initialized to ${this.start}`);
       }
     });

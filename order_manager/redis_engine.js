@@ -1,5 +1,4 @@
 const { MatchingEngine, EngineOrder } = require('./matching-engine');
-const Redis = require('ioredis');
 const Heap = require('heap'); 
 class RedisMatchingEngine extends MatchingEngine {
     constructor(symbols = [], redisClient) {
@@ -51,7 +50,7 @@ class RedisMatchingEngine extends MatchingEngine {
         const orderBookData = await this.redis.get(`orderBook:${symbol}`);
         if (orderBookData) {
             const parsedData = JSON.parse(orderBookData);
-            const current_book = createSideHeaps();
+            let current_book = {}
             current_book.asks = new Heap((a, b) => a.price_level - b.price_level);
             current_book.bids = new Heap((a, b) => b.price_level - a.price_level);
 
@@ -64,4 +63,4 @@ class RedisMatchingEngine extends MatchingEngine {
     }
 }
 
-module.exports = { RedisMatchingEngine };
+module.exports = { RedisMatchingEngine, EngineOrder };

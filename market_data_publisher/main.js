@@ -194,9 +194,11 @@ setInterval(() => {
     let type = "orderbook";
     const symbol = clientSubscriptions.get(client);
     const orderBook = orderBooks[symbol];
-    data = {
-      orderBook: orderBook,
-    };
-    updateDashboard(symbol, data, type);
+    if (!(Object.keys(orderBook.bids).length === 0 && Object.keys(orderBook.asks).length === 0)) {
+      data = {
+        orderBook: orderBook,
+      };
+      updateDashboard(symbol, data, type);
+    }
   });
 }, 1000); // Publish every  1 second
