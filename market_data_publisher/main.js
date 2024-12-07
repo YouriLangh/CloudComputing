@@ -120,11 +120,11 @@ const orderStream = new Observable(async (subscriber) => {
   const channel = await connection.createChannel();
 
   await channel.assertExchange(EXCHANGE_NAME, "fanout", { durable: true });
-  const queueName = `orderbook_queue_${process.env.POD_NAME}`;
-  await channel.assertQueue(queueName, { durable: false });
-  await channel.bindQueue(queueName, EXCHANGE_NAME, "");
+  const { queue } = await channel.assertQueue('', { exclusive: true });
+  await channel.assertQueue('', { exclusive: true });
+  await channel.bindQueue(queue, EXCHANGE_NAME, "");
 
-  channel.consume(queueName, (msg) => {
+  channel.consume(queue, (msg) => {
     if (msg) {
       const messageData = JSON.parse(msg.content.toString());
       // Process orders or executions

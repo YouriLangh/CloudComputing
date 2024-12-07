@@ -4,5 +4,5 @@
 
 # Choices:
 To run the project
-Run docker-compose up --build in the main folder
+Build the images using the build-images.sh script and then start the pipeline using the start-pipeline.sh script.
 To run the dashboard, navigate to the exchange-dashboard folder "cd exchange-dashboard" and run "npm run dev"
