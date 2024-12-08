@@ -3,8 +3,6 @@ const split2 = require("split2");
 const amqp = require("amqplib");
 const assert = require("assert");
 
-const RABBITMQ_URL = "amqp://rabbitmq";
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -27,7 +25,7 @@ async function streamOrders(cvs_filepath) {
         persistent: true,
       });
       // Limit the rate
-      await sleep(200); // 200ms delay = 5 messages/sec
+      await sleep(1000); // 200ms delay = 5 messages/sec
     } catch (error) {
       console.error("Error processing line:", line, error);
     }

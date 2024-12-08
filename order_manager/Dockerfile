@@ -7,8 +7,8 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy your application code
+# Copy application code
 COPY . .
 
-# Command to run your application
+# Command to run application
 CMD ["node", "main.js"]
