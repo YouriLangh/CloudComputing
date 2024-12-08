@@ -18,51 +18,41 @@ async function connectRedis() {
 
 // Function to set an order book for a given symbol
 async function setOrderBook(symbol, orderBook) {
-  return new Promise((resolve, reject) => {
-    redisClient.set(`orderbook:${symbol}`, JSON.stringify(orderBook), (err) => {
-      if (err) {
-        console.error(`Error setting order book for ${symbol}`, err);
-        return reject(err);
-      }
-      resolve();
-    });
-  });
+  try {
+    await redisClient.set(`orderbook:${symbol}`, JSON.stringify(orderBook));
+  } catch (err) {
+    console.error(`Error setting order book for ${symbol}`, err);
+    throw err;
+  }
 }
 
-// Function to get an order book for a given symbol
 async function getOrderBook(symbol) {
-    console.log(`Getting order book for ${symbol}`);
+  try {
     const orderBookData = await redisClient.get(`orderbook:${symbol}`);
-    if(orderBookData){
-        return JSON.parse(orderBookData);
-    } else {
-        return null;
-    }
+    return orderBookData ? JSON.parse(orderBookData) : null;
+  } catch (err) {
+    console.error(`Error getting order book for ${symbol}`, err);
+    throw err;
   }
-  
+}
 
-// Function to get average prices for a given symbol
-async function getAverages(symbol) {
-    console.log(`Getting Averages for ${symbol}`);
-    const averages = await redisClient.get(`average:${symbol}`)
-    if(averages){
-        return JSON.parse(averages);
-    } else {
-        return [];
-    }
-  }
-
-// Function to set average prices for a given symbol
 async function setAverages(symbol, averages) {
-  return new Promise((resolve, reject) => {
-    redisClient.set(`average:${symbol}`, JSON.stringify(averages), (err) => {
-      if (err) {
-        console.error(`Error setting averages for ${symbol}`, err);
-        return reject(err);
-      }
-      resolve();
-    });
-  });
+  try {
+    await redisClient.set(`average:${symbol}`, JSON.stringify(averages));
+  } catch (err) {
+    console.error(`Error setting averages for ${symbol}`, err);
+    throw err;
+  }
+}
+
+async function getAverages(symbol) {
+  try {
+    const averages = await redisClient.get(`average:${symbol}`);
+    return averages ? JSON.parse(averages) : [];
+  } catch (err) {
+    console.error(`Error getting averages for ${symbol}`, err);
+    throw err;
+  }
 }
 
 

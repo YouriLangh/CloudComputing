@@ -7,7 +7,7 @@ const redisClient = redis.createClient({
   url: `redis://${process.env.REDIS_HOST || "redis-service"}:${process.env.REDIS_PORT || 6379}`,
 });
 
-// Use Redis client's promise-based API
+// Use Redis client API
 async function connectToRedis() {
   try {
     await redisClient.connect();
@@ -55,17 +55,7 @@ class SequentialNumberGenerator {
     }
   }
 }
-// class SequentialNumberGenerator {
-//   constructor(start = 1) {
-//     this.current = start;  // Initialize the counter with the starting value
-//   }
 
-//   getNext() {
-//     const seq = this.current;  // Store the current value before incrementing
-//     this.current++;  // Increment the sequence number
-//     return seq;  // Return the previous value (before incrementing)
-//   }
-// }
 const seqGen = new SequentialNumberGenerator();
 
 async function setupRabbitMQ() {
@@ -80,7 +70,7 @@ async function setupRabbitMQ() {
   await channel.assertQueue(ORDER_MANAGER_QUEUE, { durable: true });
 
   // Ensure a dynamic queue is created and bind it to the exchange
-  const queueName = `orderbook_queue_${process.env.POD_NAME}`;
+  const queueName = `${ORDERBOOK_QUEUE}_${process.env.POD_NAME}`;
   await channel.assertQueue(queueName, { durable: true });
   await channel.bindQueue(queueName, EXCHANGE_NAME, '');  // Bind to the exchange
   console.log("RabbitMQ setup completed.");

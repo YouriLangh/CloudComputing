@@ -23,6 +23,3 @@ kubectl apply -f ./k8_config/market-data-publisher.yaml
 echo "All services and pods are running:"
 kubectl get services
 kubectl get pods
-
-# Run command: ./start-pipeline.sh
-#

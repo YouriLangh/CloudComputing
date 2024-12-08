@@ -15,7 +15,7 @@ const ORDERBOOK_QUEUE = process.env.RABBITMQ_ORDERBOOK_QUEUE;
 const EXCHANGE_NAME = "order_manager_exchange";  // Add exchange name
 const SYMBOLS = ["AAPL", "GOOGL", "MSFT", "AMZN"];
 
-let orderBooks = { bids: {}, asks: {} };
+let orderBooks = { "AAPL": {bids: {}, asks: {}}, "GOOGL": {bids: {}, asks: {}}, "MSFT": {bids: {}, asks: {}}, "AMZN": {bids: {}, asks: {}} };
 let averagePriceHistory = {};
 
 // Create WebSocket server
@@ -33,7 +33,7 @@ wss.on("connection", (ws) => {
 
   // Initialize the client's subscriptions
   clientSubscriptions.set(ws, "AAPL");
-  updateDashboard("AAPL", {
+  broadcastUpdates("AAPL", {
     averages: averagePriceHistory["AAPL"],
     orderBook: orderBooks["AAPL"],
   }, "initial");
@@ -143,10 +143,10 @@ const orderStream = new Observable(async (subscriber) => {
 orderStream
   .pipe(
     groupBy((order) => order.symbol),
-    mergeMap((group$) =>
-      group$.pipe(
+    mergeMap((group) =>
+      group.pipe(
         bufferTime(60000),
-        map((orders) => computeAverages(group$.key, orders))
+        map((orders) => computeAverages(group.key, orders))
       )
     )
   )
@@ -156,21 +156,6 @@ orderStream
     await setAverages(symbol, averagePriceHistory[symbol]);
     broadcastUpdates(symbol, { averages: averagePriceHistory[symbol] }, "averages");
   });
-
-// Publish updates to WebSocket clients
-function updateDashboard(symbol, data, type) {
-  const message = JSON.stringify({ type, data });
-
-  clients.forEach((client) => {
-    if (
-      client.readyState === WebSocket.OPEN &&
-      clientSubscriptions.get(client) === symbol
-    ) {
-      client.send(message);
-    }
-  });
-}
-
 
 
 setInterval(() => {
@@ -182,7 +167,7 @@ setInterval(() => {
       data = {
         orderBook: orderBook,
       };
-      updateDashboard(symbol, data, type);
+      broadcastUpdates(symbol, data, type);
     }
   });
 }, 1000); // Publish every  1 second
@@ -222,11 +207,7 @@ function broadcastUpdates(symbol, data, type) {
 // Load initial state from Redis and start the application
 (async () => {
   const state = await initializeState(SYMBOLS);
-  console.log("Initial state loaded", state);
-  console.log("orderbooks before", orderBooks);
   orderBooks = state.orderBooks;
-  console.log("orderbooks after", orderBooks);
   averagePriceHistory = state.averagePriceHistory;
-  console.log("Initial state loaded");
   orderStream.subscribe(); // Start the order stream
 })();

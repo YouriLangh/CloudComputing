@@ -25,7 +25,7 @@ async function streamOrders(cvs_filepath) {
         persistent: true,
       });
       // Limit the rate
-      await sleep(1000); // 200ms delay = 5 messages/sec
+      await sleep(200); // 200ms delay = 5 messages/sec
     } catch (error) {
       console.error("Error processing line:", line, error);
     }
@@ -49,6 +49,5 @@ function parseLine(line) {
   };
 }
 
-// const cvs_filepath = "/app/data/market_simulation_orders-1h.csv";
 const cvs_filepath = "./data/market_simulation_orders-1h.csv";
 streamOrders(cvs_filepath);

@@ -33,7 +33,7 @@ const App = () => {
         const { orderBook } = message.data;
         setOrderBook(orderBook);
       } else if (message.type === "averages") {
-        const averages = message.data;
+        const { averages } = message.data;
         setAverages(averages);
       }
     };
