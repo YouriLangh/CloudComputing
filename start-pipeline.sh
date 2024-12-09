@@ -10,8 +10,6 @@ sleep 25
 
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
-# kubectl apply -f ./k8_config/metric-server-components.yaml
-
 # Step 3: Deploy client-gateway & HPA
 kubectl apply -f ./k8_config/client-gateway.yaml
 
