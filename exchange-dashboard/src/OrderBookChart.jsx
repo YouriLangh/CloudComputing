@@ -34,7 +34,7 @@ const OrderBookChart = ({ orderBookData }) => {
   // Custom Tooltip Component
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      const { fill, value } = payload[0];
+      const { fill, value } = payload[0].payload;
       const type = fill === "green" ? "Bid" : "Ask";
 
       return (

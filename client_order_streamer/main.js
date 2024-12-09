@@ -25,7 +25,7 @@ async function streamOrders(cvs_filepath) {
         persistent: true,
       });
       // Limit the rate
-      await sleep(200); // 200ms delay = 5 messages/sec
+      await sleep(1000); // 200ms delay = 5 messages/sec
     } catch (error) {
       console.error("Error processing line:", line, error);
     }
