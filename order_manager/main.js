@@ -110,7 +110,6 @@ async function consumeAndForwardOrders(channel) {
     if (msg !== null) {
       try {
         const rawOrder = JSON.parse(msg.content.toString());
-        console.log("Raw order received: ", rawOrder); // Add this line to inspect the raw order
         const processedOrder = await processOrder(rawOrder);
 
         console.log(
